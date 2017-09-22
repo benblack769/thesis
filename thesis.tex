@@ -124,28 +124,152 @@
 %The \introduction command is provided as a convenience.
 %if you want special chapter formatting, you'll probably want to avoid using it altogether
 
-    \chapter*{Introduction}
-         \addcontentsline{toc}{chapter}{Introduction}
-	\chaptermark{Introduction}
-	\markboth{Introduction}{Introduction}
-	% The three lines above are to make sure that the headers are right, that the intro gets included in the table of contents, and that it doesn't get numbered 1 so that chapter one is 1.
+% The three lines above are to make sure that the headers are right, that the intro gets included in the table of contents, and that it doesn't get numbered 1 so that chapter one is 1.
 
 % Double spacing: if you want to double space, or one and a half 
 % space, uncomment one of the following lines. You can go back to 
 % single spacing with the \singlespacing command.
 % \onehalfspacing
 % \doublespacing
-	
-	Welcome to the \LaTeX\ thesis template. If you've never used \TeX\ or \LaTeX\ before, you'll have an initial learning period to go through, but the results of a nicely formatted thesis are worth it for more than the aesthetic benefit: markup like \LaTeX\ is more consistent than the output of a word processor, much less prone to corruption or crashing and the resulting file is smaller than a Word file. While you may have never had problems using Word in the past, your thesis is going to be about twice as large and complex as anything you've written before, taxing Word's capabilities. If you're still on the fence about  using \LaTeX, read the Introduction to LaTeX on the CUS site as well as skim the following template and give it a few weeks. Pretty soon all the markup gibberish will become second nature.
 
-\section{Why use it?}
-	
-\LaTeX\ does a great job of formatting tables and paragraphs. Its line-breaking algorithm was the subject of a PhD.\thinspace thesis. It does a fine job of automatically inserting ligatures, and to top it all off it is the only way to typeset good-looking mathematics.
 
-\section{Who should use it?}
-
-Anyone who needs to use math, tables, a lot of figures, complex cross-references, IPA or who just cares about the final appearance of their document should use \LaTeX. At Reed, math majors are required to use it, most physics majors will want to use it, and many other science majors may want it also.
+    \chapter*{Introduction}
+    \addcontentsline{toc}{chapter}{Introduction}
+	\chaptermark{Introduction}
+	\markboth{Introduction}{Introduction}
 	
+\section{Overall motivation}
+
+In the heterogenous computing world, there are tools to create software for specific devices. There are also languages which can compile to many different devices (e.g. OpenCL). However, the number of devices is growing, and their characteristics are getting further apart. There will probably never be one language which works for all devices, and all problems. And there is certainly not one available now. So programmers have to write code for different kinds of devices, so that their application can run efficiently. However, programmers have to rely on their knowledge and intuition to figure out what sorts of hardware is appropriate for their application. As the number of different hardware platforms keeps on growing, this puts more and more strain on software developers to become knowledgeable about all sorts of hardware.
+
+To solve this problem, we suggest making a tool, which can examine CPU code run on a typical workflow, and output suggestions of what kind of hardware different parts of the code can run on. 
+
+This will allow programmers to focus on the hardware platform that is most useful to them reducing search cost. They will still need to learn how to program that hardware, and make their code run efficiently, but at least they will not d all that work to find out that they chose the wrong hardware. 
+
+\subsection{Note about workload characterization}
+
+A related field of research is workload characterization. The purpose here is to examine how real software runs on hardware, with the purpose of improving the hardware to run the software faster. 
+
+Our work is related since both fields of study are interested in how real software performs on hardware, what sorts of software can run on what sorts of hardware. This means we will use tools originally intended for workload characterization, particularly binary instrumentation tools.
+
+However, the fields have a fundamentally different purpose. We are making a tool to help inform a software developer working with a particular software project about the many different kinds of hardware available. Workload characterization is fundamentally making a tool for the hardware developer, working with a particular piece of hardware, and informing them about the many different types of software. 
+
+This fundamental difference will mean that we cannot copy over the same techniques. In particular, hardware developers have to assume that software runs well “as is” as they cannot hope to improve it. However, software developers can change their software to fit the hardware better. So we need to be much more open to changes in the order of execution of parallel instructions, for example, as they will certainly change when moving from CPU to GPU. 
+
+It seems to me at first glance that this will mean that we need much more complete information about the program than the summary statistics that workload characterization researchers use. 
+
+Two examples I can think of right now are:
+
+\begin{enumerate}
+	\item SIMD instruction size: We need to know if the SIMD size expressed by the cpu code is optimal, or if it can be substantially increased by minor changes to the code. This may be the difference of porting it to GPU improving performance or not
+	
+	\item Level of parallelism. It is kind of difficult to find natural parallelism in arbitrary code to begin with. But when you consider that certain operations (like reductions) are implemented in a highly sequential manner in single threaded programs, but can be rewritten to run in a massively parallel manner. So ideally, we should be able to figure out if they can be written in this way.  (perhaps by keeping track of associative operations)
+\end{enumerate}
+
+\section{Parts of thesis}
+
+This thesis has several different parts. Although they also build to a single core purpose, they also have other interesting connections, inspirations and applications. 
+
+
+High level implementation description
+
+There will be several parts
+
+Tool which extracts basic runtime information from actual running code (dependencies, memory addresses, instruction type)
+Library which takes basic info from tool and converts it into hardware properties (vector sizes, pipeline sizes, parallelism)
+Library which converts hardware properties into advice about hardware
+
+
+\subsection{Parallelism detection}
+
+Parallelism detection is super useful, necessary for our goals
+
+
+We need to detect parallelism (justification is its own section). The only way to do this is to build full dependency trees. 
+
+\subsubsection{Data access compression}
+
+\subsubsection{Naive method}
+
+Build full dependency graph out in memory
+
+\subsubsection{SD$^3$ method}
+
+See paper:
+
+Doesn’t really work on all code/workloads (need backup system that works decently)
+
+Examples:
+
+Graph computations (simulations, network analysis)
+
+Non-trivial data structures (BST, hash tables)
+
+\subsubsection{More general access compression?}
+
+The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
+
+
+Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
+
+Trick: We need to somehow do efficient computations on these things.
+
+\subsection{Hardware identification}
+
+\subsubsection{Things we should consider from software side}
+
+
+\begin{itemize}
+	\item Parallelism  (whole section on that)
+		\begin{itemize} 
+		\item Instruction parallelism (super-scalar vs sequential)
+		\item Data parallelism 
+		\item Thread parallelism
+		\item Reductions
+		\end{itemize} 
+	
+	\item Memory access pattern 
+		\begin{itemize} 
+		\item is it random
+		\item does it allow for vector operations
+		\item how many 4k blocks does it touch
+		\item Does it stride
+		\end{itemize} 
+		
+	\item Instruction composition
+		\begin{itemize} 
+		\item Lots of floating points operations?
+		\item Complex integer functions (div,mul) vs simple ones (add, lea)?
+		\item  
+		\end{itemize} 
+		
+	\item Code pattern
+		\begin{itemize} 
+		\item Do branches taken in a loop diverge? If so, maybe not GPU, if not, then maybe GPU is good. 
+		\item Is there non-trivial recursion or random access code pointers? If so, then many processors like GPUs will not work. 
+		\end{itemize} 
+	
+\end{itemize}
+
+
+\subsubsection{Things we should consider from hardware side}
+
+\begin{itemize}
+	\item Power vs performance need of software (user input)
+	
+	\item Overhead from shifting between processors:
+	
+	The big problem is that shifting data across different processors, and telling those processors to do things with that data takes a significant amount of overhead. With GPUs, this can take milliseconds (source). 
+	
+	\item Superscalar pipelines/dispatch
+	
+	\item Degree and levels of parallelism in hardware
+	
+	\item Cache sizes/ hierarchy/ local-shared memory/ 
+	
+\end{itemize}
+
+
     \chapter{The First}
     	This is the first page of the first chapter. You may delete the contents of this chapter so you can add your own text; it's just here to show you some examples. 
 	
