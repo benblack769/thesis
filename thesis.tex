@@ -133,243 +133,243 @@
 % \doublespacing
 
 
-    \chapter*{Introduction}
-    \addcontentsline{toc}{chapter}{Introduction}
-	\chaptermark{Introduction}
-	\markboth{Introduction}{Introduction}
+\chapter*{Introduction}
+\addcontentsline{toc}{chapter}{Introduction}
+\chaptermark{Introduction}
+\markboth{Introduction}{Introduction}
 	
-\section{Overall motivation}
-
-In the heterogenous computing world, there are tools to create software for specific devices. There are also languages which can compile to many different devices (e.g. OpenCL). However, the number of devices is growing, and their characteristics are getting further apart. There will probably never be one language which works for all devices, and all problems. And there is certainly not one available now. So programmers have to write code for different kinds of devices, so that their application can run efficiently. However, programmers have to rely on their knowledge and intuition to figure out what sorts of hardware is appropriate for their application. As the number of different hardware platforms keeps on growing, this puts more and more strain on software developers to become knowledgeable about all sorts of hardware.
-
-To solve this problem, we suggest making a tool, which can examine CPU code run on a typical workflow, and output suggestions of what kind of hardware different parts of the code can run on. 
-
-This will allow programmers to focus on the hardware platform that is most useful to them reducing search cost. They will still need to learn how to program that hardware, and make their code run efficiently, but at least they will not d all that work to find out that they chose the wrong hardware. 
-
-\subsection{Note about workload characterization}
-
-A related field of research is workload characterization. The purpose here is to examine how real software runs on hardware, with the purpose of improving the hardware to run the software faster. 
-
-Our work is related since both fields of study are interested in how real software performs on hardware, what sorts of software can run on what sorts of hardware. This means we will use tools originally intended for workload characterization, particularly binary instrumentation tools.
-
-However, the fields have a fundamentally different purpose. We are making a tool to help inform a software developer working with a particular software project about the many different kinds of hardware available. Workload characterization is fundamentally making a tool for the hardware developer, working with a particular piece of hardware, and informing them about the many different types of software. 
-
-This fundamental difference will mean that we cannot copy over the same techniques. In particular, hardware developers have to assume that software runs well “as is” as they cannot hope to improve it. However, software developers can change their software to fit the hardware better. So we need to be much more open to changes in the order of execution of parallel instructions, for example, as they will certainly change when moving from CPU to GPU. 
-
-It seems to me at first glance that this will mean that we need much more complete information about the program than the summary statistics that workload characterization researchers use. 
-
-Two examples I can think of right now are:
-
-\begin{enumerate}
-	\item SIMD instruction size: We need to know if the SIMD size expressed by the cpu code is optimal, or if it can be substantially increased by minor changes to the code. This may be the difference of porting it to GPU improving performance or not
-	
-	\item Level of parallelism. It is kind of difficult to find natural parallelism in arbitrary code to begin with. But when you consider that certain operations (like reductions) are implemented in a highly sequential manner in single threaded programs, but can be rewritten to run in a massively parallel manner. So ideally, we should be able to figure out if they can be written in this way.  (perhaps by keeping track of associative operations)
-\end{enumerate}
-
-\section{Parts of thesis}
-
-This thesis has several different parts. Although they also build to a single core purpose, they also have other interesting connections, inspirations and applications. 
-
-
-High level implementation description
-
-There will be several parts
-
-Tool which extracts basic runtime information from actual running code (dependencies, memory addresses, instruction type)
-Library which takes basic info from tool and converts it into hardware properties (vector sizes, pipeline sizes, parallelism)
-Library which converts hardware properties into advice about hardware
-
-
-\subsection{Parallelism detection}
-
-Parallelism detection is super useful, necessary for our goals
-
-
-We need to detect parallelism (justification is its own section). The only way to do this is to build full dependency trees. 
-
-\subsubsection{Data access compression}
-
-\subsubsection{Naive method}
-
-Build full dependency graph out in memory
-
-\subsubsection{SD$^3$ method}
-
-See paper:
-
-Doesn’t really work on all code/workloads (need backup system that works decently)
-
-Examples:
-
-Graph computations (simulations, network analysis)
-
-Non-trivial data structures (BST, hash tables)
-
-\subsubsection{More general access compression?}
-
-The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
-
-
-Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
-
-Trick: We need to somehow do efficient computations on these things.
-
-\subsection{Hardware identification}
-
-\subsubsection{Things we should consider from software side}
-
-
-\begin{itemize}
-	\item Parallelism  (whole section on that)
-		\begin{itemize} 
-		\item Instruction parallelism (super-scalar vs sequential)
-		\item Data parallelism 
-		\item Thread parallelism
-		\item Reductions
-		\end{itemize} 
-	
-	\item Memory access pattern 
-		\begin{itemize} 
-		\item is it random
-		\item does it allow for vector operations
-		\item how many 4k blocks does it touch
-		\item Does it stride
-		\end{itemize} 
+	\section{Overall motivation}
 		
-	\item Instruction composition
-		\begin{itemize} 
-		\item Lots of floating points operations?
-		\item Complex integer functions (div,mul) vs simple ones (add, lea)?
-		\item  
-		\end{itemize} 
+		In the heterogeneous computing world, there are tools to create software for specific devices. There are also languages which can compile to many different devices (e.g. OpenCL). However, the number of devices is growing, and their characteristics are getting further apart. There will probably never be one language which works for all devices, and all problems. And there is certainly not one available now. So programmers have to write code for different kinds of devices, so that their application can run efficiently. However, programmers have to rely on their knowledge and intuition to figure out what sorts of hardware is appropriate for their application. As the number of different hardware platforms keeps on growing, this puts more and more strain on software developers to become knowledgeable about all sorts of hardware.
 		
-	\item Code pattern
-		\begin{itemize} 
-		\item Do branches taken in a loop diverge? If so, maybe not GPU, if not, then maybe GPU is good. 
-		\item Is there non-trivial recursion or random access code pointers? If so, then many processors like GPUs will not work. 
-		\end{itemize} 
+		To solve this problem, we suggest making a tool, which can examine CPU code run on a typical workflow, and output suggestions of what kind of hardware different parts of the code can run on. 
+		
+		This will allow programmers to focus on the hardware platform that is most useful to them reducing search cost. They will still need to learn how to program that hardware, and make their code run efficiently, but at least they will not d all that work to find out that they chose the wrong hardware. 
+		
+	\subsection{Note about workload characterization}
+		
+		A related field of research is workload characterization. The purpose here is to examine how real software runs on hardware, with the purpose of improving the hardware to run the software faster. 
+		
+		Our work is related since both fields of study are interested in how real software performs on hardware, what sorts of software can run on what sorts of hardware. This means we will use tools originally intended for workload characterization, particularly binary instrumentation tools.
+		
+		However, the fields have a fundamentally different purpose. We are making a tool to help inform a software developer working with a particular software project about the many different kinds of hardware available. Workload characterization is fundamentally making a tool for the hardware developer, working with a particular piece of hardware, and informing them about the many different types of software. 
+		
+		This fundamental difference will mean that we cannot copy over the same techniques. In particular, hardware developers have to assume that software runs well “as is” as they cannot hope to improve it. However, software developers can change their software to fit the hardware better. So we need to be much more open to changes in the order of execution of parallel instructions, for example, as they will certainly change when moving from CPU to GPU. 
+		
+		It seems to me at first glance that this will mean that we need much more complete information about the program than the summary statistics that workload characterization researchers use. 
+		
+		Two examples I can think of right now are:
+		
+		\begin{enumerate}
+			\item SIMD instruction size: We need to know if the SIMD size expressed by the cpu code is optimal, or if it can be substantially increased by minor changes to the code. This may be the difference of porting it to GPU improving performance or not
+			
+			\item Level of parallelism. It is kind of difficult to find natural parallelism in arbitrary code to begin with. But when you consider that certain operations (like reductions) are implemented in a highly sequential manner in single threaded programs, but can be rewritten to run in a massively parallel manner. So ideally, we should be able to figure out if they can be written in this way.  (perhaps by keeping track of associative operations)
+		\end{enumerate}
+		
+	\section{Parts of thesis}
+		
+		This thesis has several different parts. Although they also build to a single core purpose, they also have other interesting connections, inspirations and applications. 
+		
+		
+		High level implementation description
+		
+		There will be several parts
+		
+		Tool which extracts basic runtime information from actual running code (dependencies, memory addresses, instruction type)
+		Library which takes basic info from tool and converts it into hardware properties (vector sizes, pipeline sizes, parallelism)
+		Library which converts hardware properties into advice about hardware
+		
 	
-\end{itemize}
-
-
-\subsubsection{Things we should consider from hardware side}
-
-\begin{itemize}
-	\item Power vs performance need of software (user input)
+	\subsection{Parallelism detection}
+		
+		Parallelism detection is super useful, necessary for our goals
+		
+		
+		We need to detect parallelism (justification is its own section). The only way to do this is to build full dependency trees. 
+		
+		\subsubsection{Data access compression}
+		
+		\subsubsection{Naive method}
+		
+		Build full dependency graph out in memory
+		
+		\subsubsection{SD$^3$ method}
+		
+		See paper: \footnote{\cite{Kim:2010}}
+		
+		Doesn’t really work on all code/workloads (need backup system that works decently)
+		
+		Examples:
+		
+		Graph computations (simulations, network analysis)
+		
+		Non-trivial data structures (BST, hash tables)
+		
+		\subsubsection{More general access compression?}
+		
+		The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
+		
+		
+		Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
+		
+		Trick: We need to somehow do efficient computations on these things.
+		
+	\subsection{Hardware identification}
 	
-	\item Overhead from shifting between processors:
+	\subsubsection{Things we should consider from software side}
 	
-	The big problem is that shifting data across different processors, and telling those processors to do things with that data takes a significant amount of overhead. With GPUs, this can take milliseconds (source). 
 	
-	\item Superscalar pipelines/dispatch
+	\begin{itemize}
+		\item Parallelism  (whole section on that)
+			\begin{itemize} 
+			\item Instruction parallelism (super-scalar vs sequential)
+			\item Data parallelism 
+			\item Thread parallelism
+			\item Reductions
+			\end{itemize} 
+		
+		\item Memory access pattern 
+			\begin{itemize} 
+			\item is it random
+			\item does it allow for vector operations
+			\item how many 4k blocks does it touch
+			\item Does it stride
+			\end{itemize} 
+			
+		\item Instruction composition
+			\begin{itemize} 
+			\item Lots of floating points operations?
+			\item Complex integer functions (div,mul) vs simple ones (add, lea)?
+			\item  
+			\end{itemize} 
+			
+		\item Code pattern
+			\begin{itemize} 
+			\item Do branches taken in a loop diverge? If so, maybe not GPU, if not, then maybe GPU is good. 
+			\item Is there non-trivial recursion or random access code pointers? If so, then many processors like GPUs will not work. 
+			\end{itemize} 
+		
+	\end{itemize}
 	
-	\item Degree and levels of parallelism in hardware
 	
-	\item Cache sizes/ hierarchy/ local-shared memory/ 
+	\subsubsection{Things we should consider from hardware side}
 	
-\end{itemize}
+	\begin{itemize}
+		\item Power vs performance need of software (user input)
+		
+		\item Overhead from shifting between processors:
+		
+		The big problem is that shifting data across different processors, and telling those processors to do things with that data takes a significant amount of overhead. With GPUs, this can take milliseconds (source). 
+		
+		\item Superscalar pipelines/dispatch
+		
+		\item Degree and levels of parallelism in hardware
+		
+		\item Cache sizes/ hierarchy/ local-shared memory/ 
+		
+	\end{itemize}
 
 
-    \chapter{The First}
-    	This is the first page of the first chapter. You may delete the contents of this chapter so you can add your own text; it's just here to show you some examples. 
+\chapter{The First}
+  	This is the first page of the first chapter. You may delete the contents of this chapter so you can add your own text; it's just here to show you some examples. 
 	
-\section{References, Labels, Custom Commands and Footnotes}
-It is easy to refer to anything within your document using the \texttt{label} and \texttt{ref} tags.  Labels must be unique and shouldn't use any odd characters; generally sticking to letters and numbers (no spaces) should be fine. Put the label on whatever you want to refer to, and put the reference where you want the reference. \LaTeX\ will keep track of the chapter, section, and figure or table numbers for you. 
-
-\subsection{References and Labels}
-Sometimes you'd like to refer to a table or figure, e.g. you can see in Figure \ref{subd2} that you can rotate figures . Start by labeling your figure or table with the label command (\verb=\label{labelvariable}=) below the caption (see the chapter on graphics and tables for examples). Then when you would like to refer to the table or figure, use the ref command (\verb=\ref{labelvariable}=). Make sure your label variables are unique; you can't have two elements named ``default." Also, since the reference command only puts the figure or table number, you will have to put  ``Table" or ``Figure" as appropriate, as seen in the following examples:
-
- As I showed in Table \ref{inheritance} many factors can be assumed to follow from inheritance. Also see the Figure \ref{subd} for an illustration.
- 
-\subsection{Custom Commands}\label{commands}
-Are you sick of writing the same complex equation or phrase over and over? 
-
-The custom commands should be placed in the preamble, or at least prior to the first usage of the command. The structure of the \verb=\newcommand= consists of the name of the new command in curly braces, the number of arguments to be made in square brackets and then, inside a new set of curly braces, the command(s) that make up the new command. The whole thing is sandwiched inside a larger set of curly braces. 
-
-% Note: you cannot use numbers in your commands!
-\newcommand{\hydro}{H$_2$SO$_4$}
-
-In other words, if you want to make a shorthand for H$_2$SO$_4$, which doesn't include an argument, you would write: \verb=\newcommand{\hydro}{H$_2$SO$_4$}= and then when you needed  to use the command you would type \verb=\hydro=. (sans verb and the equals sign brackets, if you're looking at the .tex version). For example: \hydro
-
-\subsection{Footnotes and Endnotes}
-	You might want to footnote something.\footnote{footnote text} Be sure to leave no spaces between the word immediately preceding the footnote command and the command itself. The footnote will be in a smaller font and placed appropriately. Endnotes work in much the same way. More information can be found about both on the CUS site.
+	\section{References, Labels, Custom Commands and Footnotes}
+	It is easy to refer to anything within your document using the \texttt{label} and \texttt{ref} tags.  Labels must be unique and shouldn't use any odd characters; generally sticking to letters and numbers (no spaces) should be fine. Put the label on whatever you want to refer to, and put the reference where you want the reference. \LaTeX\ will keep track of the chapter, section, and figure or table numbers for you. 
 	
-\section{Bibliographies}
-	Of course you will need to cite things, and you will probably accumulate an armful of sources. This is why BibTeX was created. For more information about BibTeX and bibliographies, see our CUS site (\url{web.reed.edu/cis/help/latex/index.html})\footnote{\cite{reedweb:2007}}. There are three pages on this topic: {\it bibtex} (which talks about using BibTeX, at \url{/latex/bibtex.html}), {\it bibtexstyles} (about how to find and use the bibliography style that best suits your needs, at \url{/latex/bibtexstyles.html}) and {\it bibman} (which covers how to make and maintain a bibliography by hand, without BibTeX, at at \url{/latex/bibman.html}). The last page will not be useful unless you have only a few sources. There used to be APA stuff here, but we don't need it since I've fixed this with my apa-good natbib style file.
+	\subsection{References and Labels}
+	Sometimes you'd like to refer to a table or figure, e.g. you can see in Figure \ref{subd2} that you can rotate figures . Start by labeling your figure or table with the label command (\verb=\label{labelvariable}=) below the caption (see the chapter on graphics and tables for examples). Then when you would like to refer to the table or figure, use the ref command (\verb=\ref{labelvariable}=). Make sure your label variables are unique; you can't have two elements named ``default." Also, since the reference command only puts the figure or table number, you will have to put  ``Table" or ``Figure" as appropriate, as seen in the following examples:
 	
-\subsection{Tips for Bibliographies}
-\begin{enumerate}
-\item Like with thesis formatting, the sooner you start compiling your bibliography for something as large as thesis, the better. Typing in source after source is mind-numbing enough; do you really want to do it for hours on end in late April? Think of it as procrastination.
-\item The cite key (a citation's label) needs to be unique from the other entries.
-\item When you have more than one author or editor, you need to separate each author's name by the word ``and'' e.g.\\ \verb+Author = {Noble, Sam and Youngberg, Jessica},+.
-\item Bibliographies made using BibTeX (whether manually or using a manager) accept LaTeX markup, so you can italicize and add symbols as necessary.
-\item To force capitalization in an article title or where all lowercase is generally used, bracket the capital letter in curly braces.
-\item You can add a Reed Thesis citation\footnote{\cite{noble:2002}} option. The best way to do this is to use the phdthesis type of citation, and use the optional ``type'' field to enter ``Reed thesis'' or ``Undergraduate thesis''. Here's a test of Chicago, showing the second cite in a row\footnote{\cite{noble:2002}} being different. Also the second time not in a row\footnote{\cite{reedweb:2007}} should be different. Of course in other styles they'll all look the same.
-\end{enumerate}
-\section{Anything else?}
-If you'd like to see examples of other things in this template, please contact CUS (email cus@reed.edu) with your suggestions. We love to see people using \LaTeX\ for their theses, and are happy to help.
+	 As I showed in Table \ref{inheritance} many factors can be assumed to follow from inheritance. Also see the Figure \ref{subd} for an illustration.
+		 
+	\subsection{Custom Commands}\label{commands}
+	Are you sick of writing the same complex equation or phrase over and over? 
+	
+	The custom commands should be placed in the preamble, or at least prior to the first usage of the command. The structure of the \verb=\newcommand= consists of the name of the new command in curly braces, the number of arguments to be made in square brackets and then, inside a new set of curly braces, the command(s) that make up the new command. The whole thing is sandwiched inside a larger set of curly braces. 
+	
+	% Note: you cannot use numbers in your commands!
+	\newcommand{\hydro}{H$_2$SO$_4$}
+	
+	In other words, if you want to make a shorthand for H$_2$SO$_4$, which doesn't include an argument, you would write: \verb=\newcommand{\hydro}{H$_2$SO$_4$}= and then when you needed  to use the command you would type \verb=\hydro=. (sans verb and the equals sign brackets, if you're looking at the .tex version). For example: \hydro
+
+	\subsection{Footnotes and Endnotes}
+		You might want to footnote something.\footnote{footnote text} Be sure to leave no spaces between the word immediately preceding the footnote command and the command itself. The footnote will be in a smaller font and placed appropriately. Endnotes work in much the same way. More information can be found about both on the CUS site.
+		
+	\section{Bibliographies}
+		Of course you will need to cite things, and you will probably accumulate an armful of sources. This is why BibTeX was created. For more information about BibTeX and bibliographies, see our CUS site (\url{web.reed.edu/cis/help/latex/index.html})\footnote{\cite{reedweb:2007}}. There are three pages on this topic: {\it bibtex} (which talks about using BibTeX, at \url{/latex/bibtex.html}), {\it bibtexstyles} (about how to find and use the bibliography style that best suits your needs, at \url{/latex/bibtexstyles.html}) and {\it bibman} (which covers how to make and maintain a bibliography by hand, without BibTeX, at at \url{/latex/bibman.html}). The last page will not be useful unless you have only a few sources. There used to be APA stuff here, but we don't need it since I've fixed this with my apa-good natbib style file.
+		
+	\subsection{Tips for Bibliographies}
+	\begin{enumerate}
+	\item Like with thesis formatting, the sooner you start compiling your bibliography for something as large as thesis, the better. Typing in source after source is mind-numbing enough; do you really want to do it for hours on end in late April? Think of it as procrastination.
+	\item The cite key (a citation's label) needs to be unique from the other entries.
+	\item When you have more than one author or editor, you need to separate each author's name by the word ``and'' e.g.\\ \verb+Author = {Noble, Sam and Youngberg, Jessica},+.
+	\item Bibliographies made using BibTeX (whether manually or using a manager) accept LaTeX markup, so you can italicize and add symbols as necessary.
+	\item To force capitalization in an article title or where all lowercase is generally used, bracket the capital letter in curly braces.
+	\item You can add a Reed Thesis citation\footnote{\cite{noble:2002}} option. The best way to do this is to use the phdthesis type of citation, and use the optional ``type'' field to enter ``Reed thesis'' or ``Undergraduate thesis''. Here's a test of Chicago, showing the second cite in a row\footnote{\cite{noble:2002}} being different. Also the second time not in a row\footnote{\cite{reedweb:2007}} should be different. Of course in other styles they'll all look the same.
+	\end{enumerate}
+	\section{Anything else?}
+	If you'd like to see examples of other things in this template, please contact CUS (email cus@reed.edu) with your suggestions. We love to see people using \LaTeX\ for their theses, and are happy to help.
 
 
 \chapter{Mathematics and Science}	
-\section{Math}
-	\TeX\ is the best way to typeset mathematics. Donald Knuth designed \TeX\ when he got frustrated at how long it was taking the typesetters to finish his book, which contained a lot of mathematics. 
+	\section{Math}
+		\TeX\ is the best way to typeset mathematics. Donald Knuth designed \TeX\ when he got frustrated at how long it was taking the typesetters to finish his book, which contained a lot of mathematics. 
+		
+		If you are doing a thesis that will involve lots of math, you will want to read the following section which has been commented out. If you're not going to use math, skip over this next big red section. (It's red in the .tex file but does not show up in the .pdf.)
 	
-	If you are doing a thesis that will involve lots of math, you will want to read the following section which has been commented out. If you're not going to use math, skip over this next big red section. (It's red in the .tex file but does not show up in the .pdf.)
-%	
-%% MATH and PHYSICS majors: Uncomment the following section	
-%	$$\sum_{j=1}^n (\delta\theta_j)^2 \leq {{\beta_i^2}\over{\delta_i^2 + \rho_i^2}}
-%\left[ 2\rho_i^2 + {\delta_i^2\beta_i^2\over{\delta_i^2 + \rho_i^2}} \right] \equiv \omega_i^2
-%$$
+% MATH and PHYSICS majors: Uncomment the following section	
+	$$\sum_{j=1}^n (\delta\theta_j)^2 \leq {{\beta_i^2}\over{\delta_i^2 + \rho_i^2}}
+\left[ 2\rho_i^2 + {\delta_i^2\beta_i^2\over{\delta_i^2 + \rho_i^2}} \right] \equiv \omega_i^2
+$$
 
-%From Informational Dynamics, we have the following (Dave Braden):
+From Informational Dynamics, we have the following (Dave Braden):
 
-%After {\it n} such encounters the posterior density for $\theta$ is
+After {\it n} such encounters the posterior density for $\theta$ is
 
-%$$
-%\pi(\theta|X_1< y_1,\dots,X_n<y_n) \varpropto \pi(\theta) \prod_{i=1}^n\int_{-\infty}^{y_i}
-%   \exp\left(-{(x-\theta)^2\over{2\sigma^2}}\right)\ dx
-%$$
+$$
+\pi(\theta|X_1< y_1,\dots,X_n<y_n) \varpropto \pi(\theta) \prod_{i=1}^n\int_{-\infty}^{y_i}
+   \exp\left(-{(x-\theta)^2\over{2\sigma^2}}\right)\ dx
+$$
 
-%
 
-%Another equation:
 
-%$$\det\left|\,\begin{matrix}%
-%c_0&c_1\hfill&c_2\hfill&\ldots&c_n\hfill\cr
-%c_1&c_2\hfill&c_3\hfill&\ldots&c_{n+1}\hfill\cr
-%c_2&c_3\hfill&c_4\hfill&\ldots&c_{n+2}\hfill\cr
-%\,\vdots\hfill&\,\vdots\hfill&
-%  \,\vdots\hfill&&\,\vdots\hfill\cr
-%c_n&c_{n+1}\hfill&c_{n+2}\hfill&\ldots&c_{2n}\hfill\cr
-%\end{matrix}\right|>0$$
+Another equation:
 
-%
-%Lapidus and Pindar, Numerical Solution of Partial Differential Equations in Science and
-%Engineering.  Page 54
+$$\det\left|\,\begin{matrix}%
+c_0&c_1\hfill&c_2\hfill&\ldots&c_n\hfill\cr
+c_1&c_2\hfill&c_3\hfill&\ldots&c_{n+1}\hfill\cr
+c_2&c_3\hfill&c_4\hfill&\ldots&c_{n+2}\hfill\cr
+\,\vdots\hfill&\,\vdots\hfill&
+  \,\vdots\hfill&&\,\vdots\hfill\cr
+c_n&c_{n+1}\hfill&c_{n+2}\hfill&\ldots&c_{2n}\hfill\cr
+\end{matrix}\right|>0$$
 
-%$$
-%\int_t\left\{\sum_{j=1}^3 T_j \left({d\phi_j\over dt}+k\phi_j\right)-kT_e\right\}w_i(t)\ dt=0,
-%   \qquad\quad i=1,2,3. 
-%$$
 
-%L\&P  Galerkin method weighting functions.  Page 55
+Lapidus and Pindar, Numerical Solution of Partial Differential Equations in Science and
+Engineering.  Page 54
 
-%$$
-%\sum_{j=1}^3 T_j\int_0^1\left\{{d\phi_j\over dt} + k\phi_j\right\} \phi_i\ dt 
-%   = \int_{0}^1k\,T_e\phi_idt, \qquad i=1,2,3 $$
-%   
-%Another L\&P (p145)
+$$
+\int_t\left\{\sum_{j=1}^3 T_j \left({d\phi_j\over dt}+k\phi_j\right)-kT_e\right\}w_i(t)\ dt=0,
+   \qquad\quad i=1,2,3. 
+$$
 
-%$$
-%\int_{-1}^1\!\int_{-1}^1\!\int_{-1}^1 f\big(\xi,\eta,\zeta\big) 
-%   = \sum_{k=1}^n\sum_{j=1}^n\sum_{i=1}^n w_i w_j w_k f\big( \xi,\eta,\zeta\big).
-%$$
+L\&P  Galerkin method weighting functions.  Page 55
 
-%Another L\&P (p126)
+$$
+\sum_{j=1}^3 T_j\int_0^1\left\{{d\phi_j\over dt} + k\phi_j\right\} \phi_i\ dt 
+   = \int_{0}^1k\,T_e\phi_idt, \qquad i=1,2,3 $$
+   
+Another L\&P (p145)
 
-%$$
-%\int_{A_e} (\,\cdot\,) dx dy = \int_{-1}^1\!\int_{-1}^1 (\,\cdot\,) \det[J] d\xi d\eta.
-%$$
+$$
+\int_{-1}^1\!\int_{-1}^1\!\int_{-1}^1 f\big(\xi,\eta,\zeta\big) 
+   = \sum_{k=1}^n\sum_{j=1}^n\sum_{i=1}^n w_i w_j w_k f\big( \xi,\eta,\zeta\big).
+$$
+
+Another L\&P (p126)
+
+$$
+\int_{A_e} (\,\cdot\,) dx dy = \int_{-1}^1\!\int_{-1}^1 (\,\cdot\,) \det[J] d\xi d\eta.
+$$
 
 \section{Chemistry 101: Symbols}
 Chemical formulas will look best if they are not italicized. Get around math mode's automatic italicizing by using the argument \verb=$\mathrm{formula here}$=, with your formula inside the curly brackets.
