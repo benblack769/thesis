@@ -182,10 +182,21 @@
 	
 	\subsection{Parallelism detection}
 		
-		Parallelism detection is super useful, necessary for our goals
+		Parallelism detection is super useful for many different applications. 
 		
+		People have suggested using it for determine where to make speculative automatic parallelization. \footnote{\cite{Chen:2004}} There idea here is that the compiler may not be able to establish provable parallelism, but may be able to generate code where if there is not a data conflict, there is minimal performance loss. Of course, if there is, there may be significant performance loss, so the profiler needs to establish a high degree of parallelism on real inputs. 
 		
-		We need to detect parallelism (justification is its own section). The only way to do this is to build full dependency trees. 
+		It is also useful in a tool which tell the software developer what is parallelizeable and what is not.[CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!]
+		In larger, complex software, often dependencies are not clearly defined, and manually determining dependencies by sifting through code may be impractical. But dynamic dependency analysis will tell the developer for sure if a block of code can be safely parallelized on the inputs given (it guarantees nothing about other inputs, but this test may be good enough for many developers).
+		
+		Then, of course, it is critical for our goal. The common theme among new architectures is trading off single threaded performance for power efficiency or high degrees of parallelism [CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!].
+		So determining whether it can exploit parallelism is critical to establishing whether the decrease in sequential performance is will be sufficiently offset by improved parallelism. 
+		
+		So we need to detect parallelism. How do we go about doing this?
+		
+		\subsubsection{Pairwise Method}
+		
+			The general method is called the pair-wise method. 
 		
 	\subsection{binary instrumentation}
 		\footnote{\cite{Luk:2005}}
