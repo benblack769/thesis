@@ -37,6 +37,8 @@
 \usepackage[hyphens]{url}
 \usepackage{rotating}
 \usepackage{natbib}
+\usepackage{listings}
+
 % Comment out the natbib line above and uncomment the following two lines to use the new 
 % biblatex-chicago style, for Chicago A. Also make some changes at the end where the 
 % bibliography is included. 
@@ -134,6 +136,7 @@
 
 
 \chapter*{Introduction}
+\lstset{language=C++}
 \addcontentsline{toc}{chapter}{Introduction}
 \chaptermark{Introduction}
 \markboth{Introduction}{Introduction}
@@ -145,6 +148,53 @@
 		To solve this problem, we suggest making a tool, which can examine CPU code run on a typical workflow, and output suggestions of what kind of hardware different parts of the code can run on. 
 		
 		This will allow programmers to focus on the hardware platform that is most useful to them reducing search cost. They will still need to learn how to program that hardware, and make their code run efficiently, but at least they will not d all that work to find out that they chose the wrong hardware. 
+		
+		\subsection{General areas of use cases}
+		
+		\subsubsection{Performance-Generality tradeoff}
+		
+		General purpose hardware to improve performance is fairly limited in scope. GPUs are broadly understood by the performance programming community, and more accessible tools are improving at a great pace. FGPAs are quickly catching up. And other coprocessors, like Audio and Encryption accelerators seem to lack proper enough generality to be useful in broad cases [CHECK IF THIS IS ACTUALLY TRUE, LOOK FOR PEOPLE WHO HAVE TRIED TO DO THIS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!].
+		
+		This is because the tradeoff between generality and performance, which has few points since the software efforts to adopt new hardware is too great to justify too many points.
+		
+		One possible use case is reducing the cost of adding more points to this curve. If people can match code to hardware capabilities easily, then the search cost of finding the right parts of the software and finding the right parts of the hardware can be reduced. Lowering the cost of changes along this curve can increase granularity, and perhaps bring a new wave of slightly less general hardware. [TALK ABOUT EITAN'S SMART NICs]
+		
+		However, while this use case is intriguing in theory, in practice, it will change nothing until people are already using it,  which is unlikely if it is not very useful. So we need to look for other useful. 
+		
+		\subsubsection{Power-Performance tradeoff}
+		
+		Perhaps the most useful application of this design is helping programmers understand how different hardware platforms will impact power consumption. 
+		
+		Performance and generality have clear tradeoffs. But when you throw in power into the mix, the hardware world becomes much more daunting.
+		
+		In power, the hardware can simply adopt similar software interfaces, but have dramatically different 
+		
+		\footnote{\cite{Taylor:2013}}
+		
+		There are a wide variety of new hardware 
+		
+		%\subsection{Mainstream approach}
+		
+		%Right now, people face the tradeoff between performance and productivity as a fact of life. Except for GPUs, which have mature high level languages, adopting a new hardware platform usually means 
+		
+		%The reality is that the vast majority of software does not see heterogenous computing as a viable option. Of course, machines are fast enough that we don't have to worry about most software, only ones that consume lots of resources. 
+		
+		%So what kinds of software are we looking to help?
+		
+		%The advance of scripting languages such as Python, Ruby, and Javascript means that most modern code is running much slower than it could be if written in a more performance centric language, and so improvements in software can dramatically improve performance and power with no changes to hardware. This is the extreme "productivity" side of the tradeoff,  and there is little we can do here. 
+		
+		%But the advance of these scripting languages also has brought fast CPU-GPU libraries to exploit various hardware platforms. This is a dominant paradigm in scientific computing. 
+		
+		%The best supported and most popular libraries, like BLAS, have separate implementations for every imaginable hardware platform. This is the extreme "performance" side of the tradeoff, and again, there is little we can do. 
+		
+		%\subsection{Best approach (mainstream among theorists)}
+		
+		%Right now, academics see the most promising route to be changing software models. 
+		
+		%Existing cross heterogeneous computing languages and paradigms, such as OpenCL, struggle with "performance portability." This means that when the programmer tries to run the code on new hardware, it may run much worse than the original hardware. [CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!]
+		
+		%\subsection{Improving mainstream approach}
+		
 		
 	\subsection{Note about workload characterization}
 		
@@ -166,6 +216,53 @@
 			\item Level of parallelism. It is kind of difficult to find natural parallelism in arbitrary code to begin with. But when you consider that certain operations (like reductions) are implemented in a highly sequential manner in single threaded programs, but can be rewritten to run in a massively parallel manner. So ideally, we should be able to figure out if they can be written in this way.  (perhaps by keeping track of associative operations)
 		\end{enumerate}
 		
+		\subsection{Note about Intel\textsuperscript{\textregistered} Advisor}
+		
+		Intel advisor is a very similar tool to what we are using. It's goal is to tell the programmer how they should go about vectorizing and threading their code. This tool can be very effective for both Intel CPUs and Intel Xeon Phi Coprocessors. 
+		
+		Our end goals are quite separate. Intel's goal is to create an interactive workflow that continuously profiles code on the machine as you optimize it. This is impossible for our purposes, as we will only instrument CPU binary code (this is the only code Intel cares about), and not the code of the machine we are interested in making inferences about.  
+		
+		But this goal is super important in its own right, and there does not appear to be an open source alternative to intel's tools right now. 
+		
+		One use case goes like this:
+		
+		\begin{enumerate}
+			\item 
+			You are developing code for a system, you profile the code and you find a performance critical section.
+			\item You use our tool to understand if this section of code can be parallelized, and what kind of parallelization it can handle (vector, thread, or both). 
+			
+			\item If the tool tells you it can be parrelelized, and what kind, this will allow you to confidently spend time on this code knowing that it will be worth it. 
+			
+			If the tool tells you it can't be parrelleized, then it should give you some indication about why it can't be, and where in the code the problem is arising. 
+			
+			This should allow the programmer to determine if there is some workaround for the problem.
+			
+			possible problems/fixes:
+			
+			\begin{enumerate}
+				\item Problem: Critical data dependency:
+				
+				Possible solution: Perhaps there is an algebraic or algorithmic trick that allows you to parrelleize it.
+				
+				\item Problem: side data dependency (dependency occurs in a logger, assert, or some other non-critical code)
+				
+				Possible solution: There is usually some workaround here. In the worst case, you can just remove the non-critical code. 
+				
+				\item Data strides of more than 1 (hurts vectorization):
+				
+				Possible solution: This can usually be optimized somehow, although sometimes the solution is not trivial. 
+				
+				\item Non-regular access (vector issues). Similar to previous one, except even less likely to succeed, and even more non-trivial. 
+			\end{enumerate}
+			
+		\end{enumerate} 
+		
+		Note that while this is useful for developing faster code for a single system, it is also necessary to properly use our tool. Parallelism is a critical input to the analysis, and if it is wrong, because of some minor error that can be fixed easily, then you need to fix it before running the analysis, or else it will make a mistaken analysis. 
+		
+		And the Intel advisor code involved is very proprietary, and the tools are very expensive (starts at \$1600), and it is not built to be useful for non-Intel processors, or even Intel Integrated Graphics, so it will not be very helpful to achive our goals.
+		
+		So we need some sort of analysis seperate from Intel Advisor, but which allows for a similar workflow. 
+		
 	\section{Parts of thesis}
 		
 		This thesis has several different parts. Although they also build to a single core purpose, they also have other interesting connections, inspirations and applications. 
@@ -182,6 +279,8 @@
 	
 	\subsection{Parallelism detection}
 		
+		\subsubsection{Applications of parallelism detection}
+		
 		Parallelism detection is super useful for many different applications. 
 		
 		People have suggested using it for determine where to make speculative automatic parallelization. \footnote{\cite{Chen:2004}} There idea here is that the compiler may not be able to establish provable parallelism, but may be able to generate code where if there is not a data conflict, there is minimal performance loss. Of course, if there is, there may be significant performance loss, so the profiler needs to establish a high degree of parallelism on real inputs. 
@@ -192,41 +291,10 @@
 		Then, of course, it is critical for our goal. The common theme among new architectures is trading off single threaded performance for power efficiency or high degrees of parallelism [CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!].
 		So determining whether it can exploit parallelism is critical to establishing whether the decrease in sequential performance is will be sufficiently offset by improved parallelism. 
 		
-		So we need to detect parallelism. How do we go about doing this?
-		
-		\subsubsection{Pairwise Method}
-		
-			The general method is called the pair-wise method. 
+		So we need to detect parallelism. How do we go about doing this? (Chapter 1)
 		
 	\subsection{binary instrumentation}
 		\footnote{\cite{Luk:2005}}
-		
-	\subsection{Data access compression}
-		
-		\subsubsection{Naive method}
-		
-		Build full dependency graph out in memory
-		
-		\subsubsection{SD$^3$ method}
-		
-		See paper: \footnote{\cite{Kim:2010}}
-		
-		Doesn’t really work on all code/workloads (need backup system that works decently)
-		
-		Examples:
-		
-		Graph computations (simulations, network analysis)
-		
-		Non-trivial data structures (BST, hash tables)
-		
-		\subsubsection{More general access compression?}
-		
-		The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
-		
-		
-		Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
-		
-		Trick: We need to somehow do efficient computations on these things.
 		
 	\subsection{Hardware identification}
 	
@@ -283,6 +351,122 @@
 		
 	\end{itemize}
 
+\chapter{Dynamic parallelism detection}
+	\section{Data Dependency graphs}
+		
+		
+		\subsection{Reporting}
+		
+		Just detecting a binary "is parallel" or "is not parallel" is not particularly useful. If it is a small loop, then it is easy to see if it is parallel or not by hand. A larger loop in real code is quite unlikely to have no data dependencies at all, and so they will rarely be parallel. If the parallelism detector says a larger function is not parallel, then the analysis you do with it won't know if the part that is not parallel is important or not. It could be an assert or logging that is non-vital, or perhaps something that can be pulled out of the loop. However, it is difficult to automatically detect such things, but instead, we can report what in the loop is stopping the function from being parallel to a human. A human, one shown where the problems are, may be able to tell  And a human using this tool won't know where the problem is, and may take a lot of work to find this issues, unless the code tells the human where to look. The most useful information is what instruction the conflicts are coming from, but there are others, for example, the memory location, and the number of accesses which conflict. 
+		
+		The number of times conflicting accesses happen is useful for us because it gives some indication as to how well it were to perform if we had some sort of locking mechanism serializing accesses to the bit of memory. 
+		
+		Because this is not the main point of the thesis, I will focus on making a good attempt to report the instruction locations of the conflict, and the number of times conflicts happen. But perfection is not necessary here.
+	\section{Pairwise method}
+		The pairwise method is a approximation of data dependence analysis which has been developed to examine loop level parallelism. 
+		
+		
+		\subsection{Inaccuracy}
+		
+		This method is not a perfect calculation of parallelism. Lets look at the following code for a counterexample:
+		
+\begin{lstlisting}
+for(int i = 0; i < n; i++){
+	B[i] = A[i];
+	A[i] = C[i];
+}
+\end{lstlisting}
+		
+		This is clearly parallelizable, yet because the pairwise method focuses on memory locations instead of expressions and calculations, it will determine that this is a read-write dependency, and thus not parallelizable. 
+		
+		
+	
+		\subsection{Memory/Performance issues}
+		
+		Unfortunately, a naive implementation of the pairwise method can consume hundreds of times more memory than the executable code. 
+		
+		Each loop needs its own copy of all the accesses made by every instruction. This could mean in theory a $cmn$, where $c$ is the number of bytes needed to store the relevant info, (say 20, at least), $m$ is the number of instructions, and $n$ is the number of bytes of memory used by the executable program. 
+		
+		Of course, in practice it is quite a bit more efficient than this, since not every instruction will access every byte of memory, but it will still take up more memory than most computers can hold just to run basic benchmarks. \footnote{\cite{Kim:2010}}
+		
+		\subsection{Memory/Performance solutions}
+		
+		A solution to the memory problems of the pairwise method is stride based compression. The SD3 paper lays this out in some detail \footnote{\cite{Kim:2010}}
+		
+		\subsection{Data access compression}
+		
+		\subsubsection{Naive method}
+		
+		Build full dependency graph out in memory
+		
+		\subsubsection{SD$^3$ method}
+		
+		See paper: \footnote{\cite{Kim:2010}}
+		
+		Doesn’t really work on all code/workloads (need backup system that works decently)
+		
+		Examples:
+		
+		Graph computations (simulations, network analysis)
+		
+		Non-trivial data structures (BST, hash tables)
+		
+		\subsubsection{More general access compression?}
+		
+		The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
+		
+		
+		Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
+		
+		Trick: We need to somehow do efficient computations on these things.
+		
+		
+		\subsection{Registers and Flags}
+		Unfortunately, memory locations are no the only source of possible memory dependencies. There are also registers. Some papers ignore this case, as register dependencies can be analyzed statically.\footnote{\cite{Chen:2004}} However,for our uses, we need to know about register dependencies, and so we need to do this either statically or dynamically. 
+		
+		Static analysis would mean introducing new tools to our project, and even register static analysis is not perfect (due to branching dependences).
+		
+		Dynamic analysis of registers could be easily implemented as a special case of memory dependence, as registers can just be considered another type of memory. However, registers are changed far more often than memory, and so we would need to do things somewhat differently if we don't want to suffer a large performance hit. 
+		
+		So we need to make some kind of tradeoff here. I think the right choice is to do dynamic dependence analysis, but keep it quite separate from memory dependence analysis. 
+		
+		\subsection{Dependency collision function}
+		
+		\subsection{Kill bit collision function}
+		
+		\subsection{Bit calculation performance optimization}
+		
+		
+		
+	\section{Stride compression}
+		
+		\subsection{Examples of different kinds of strides}
+		The most common and important kind of stride is accessing every element of standard array. This can be a dense stride, if you are accessing the entire element. But often, you have a array of structs, and you are only accessing part of the struct in the loop. This is a $ $
+		
+		The other main kind is going along an axis of an $n$-dimensional grid. 
+		
+		But there are other kinds of stride accesses. For instance: diagonals on an $n$-dimensional grid (bishop movement in chess). Or linear derandomization, like in linear open hashing. 
+		
+	\section{Stride based dependency checking on normal access patterns}
+		
+		Lets say we have 2 strides in the form $[ax+c]$ for $0\le x \le \alpha$, and $[by+d]$, for $0 \le y \le \beta$. We want to quickly and efficiently check if there is a dependency, and if so, then where they are. 
+		
+		GCD negative check: If $|d-c| \ne 0 \mod \gcd(a,b)$, then there is no dependency. Intuitively, this is true because if the difference between the strides is a value that cannot be taken by combinations of $a$ and $b$, then there can never be an overlap. 
+		
+		Interval Overlap Check: If intervals $[c,a\alpha+c]$, $[d,d+b\beta]$ do not overlap, then there is no dependency. 
+		
+		In order to have a positive check for dependencies, and to count the number of dependencies, there is a little more you have to do, but it can still be done efficiently. 
+		
+		\subsection{Handling different sized blocks}
+		
+		Unfortunately, things are more complicated then they might seem just looking at the above. 
+		The reason is that hardware allows memory accesses of varying bytes on the same data. For example, you might examine a text one byte at a time, and then later examine it in 8 byte blocks. Even worse, common hardware does not force aligned access. So there might be a 4 byte access with stride length of 12 bytes, starting from 3, and a 8 byte access of 16 stride length starting from 7. So we need to introduce another concept to stride checking in order to make this work: block size. 
+		
+		There is an efficient way of finding if there is an dependency, assuming strides length is a multiple of block size for all strides. And we can just make our stride detector only detect strides like this.
+		
+		But how do we find the exact number of dependencies and where they are? What do we do about killed bits in this context (since this can lead to really awkward strides)? 
+		
+		So instead of carefully dealing with abnormal strides like this slowly and carefully, I will instead just make basic checks, and then assume the worst case, whatever that may be in this context. 
 
 \chapter{The First}
   	This is the first page of the first chapter. You may delete the contents of this chapter so you can add your own text; it's just here to show you some examples. 
