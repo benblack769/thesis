@@ -38,6 +38,8 @@
 \usepackage{rotating}
 \usepackage{natbib}
 \usepackage{listings}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
 
 % Comment out the natbib line above and uncomment the following two lines to use the new 
 % biblatex-chicago style, for Chicago A. Also make some changes at the end where the 
@@ -362,9 +364,11 @@
 		The number of times conflicting accesses happen is useful for us because it gives some indication as to how well it were to perform if we had some sort of locking mechanism serializing accesses to the bit of memory. 
 		
 		Because this is not the main point of the thesis, I will focus on making a good attempt to report the instruction locations of the conflict, and the number of times conflicts happen. But perfection is not necessary here.
+		
 	\section{Pairwise method}
 		The pairwise method is a approximation of data dependence analysis which has been developed to examine loop level parallelism. 
 		
+		Loop level parallelism is when one iteration of a loop is independent from the rest. This kind of parallelism is the main target of massively parallel architectures. Other types of parallelism, including parallel recursive calls and task parallelism are generally less important or less parrelelizable, than loop level parallelism. 
 		
 		\subsection{Inaccuracy}
 		
@@ -372,7 +376,7 @@
 		
 \begin{lstlisting}
 for(int i = 0; i < n; i++){
-	B[i] = A[i];
+	B[i] = A[i-1];
 	A[i] = C[i];
 }
 \end{lstlisting}
@@ -399,9 +403,9 @@ for(int i = 0; i < n; i++){
 		
 		Build full dependency graph out in memory
 		
-		\subsubsection{SD$^3$ method}
+	\section{SD$^3$ method}
 		
-		See paper: \footnote{\cite{Kim:2010}}
+		Since both  paper: \footnote{\cite{Kim:2010}}
 		
 		Doesn’t really work on all code/workloads (need backup system that works decently)
 		
@@ -422,13 +426,43 @@ for(int i = 0; i < n; i++){
 		
 		
 		\subsection{Registers and Flags}
-		Unfortunately, memory locations are no the only source of possible memory dependencies. There are also registers. Some papers ignore this case, as register dependencies can be analyzed statically.\footnote{\cite{Chen:2004}} However,for our uses, we need to know about register dependencies, and so we need to do this either statically or dynamically. 
+		Unfortunately, memory locations are no the only source of possible memory dependencies. There are also registers.
 		
-		Static analysis would mean introducing new tools to our project, and even register static analysis is not perfect (due to branching dependences).
 		
-		Dynamic analysis of registers could be easily implemented as a special case of memory dependence, as registers can just be considered another type of memory. However, registers are changed far more often than memory, and so we would need to do things somewhat differently if we don't want to suffer a large performance hit. 
+		One case of a unparrelelizable register/flag dependency is multiprecision addition.
+		
+		Say you have 2 numbers of arbitrary size, $A0$, and $B$. $A_i$ is the $i$th 64 bit block of $A$. Then you have the following algorithm to compute addition:
+		
+		\begin{lstlisting}
+cary = 0
+for(int i = 0; i < min_size(A,B); i++){
+	R[i] = A[i] + B[i] + cary;
+	if(overflow_flag){
+		cary = 1
+	}
+	else{
+		cary = 0
+	}
+}
+...
+		\end{lstlisting}
+		
+		The first thing to note is that in the worst case, you cannot write to any element of $R_i$ before reading every element of $A$ and $B$ before $i$. So it is not parrelelizable in this case. In practice, it will be somewhat parrelelizable, since that case can safely be assumed to be rare. But a memory-only pairwise method will see that this loop is trivially parrelelizable. On the other hand, looking at the registers, there is a clear read-after-write conflict. 
+		
+		Some papers ignore this case, as register dependencies can be analyzed statically.\footnote{\cite{Chen:2004}} However,for our uses, we need to know about register dependencies, and so we need to do this either statically or dynamically. 
+		
+		Static analysis would mean introducing new tools to our project, and even static analysis may yield false negatives of parallelism (due to branching dependences). 
+		
+		Dynamic analysis of registers could be easily implemented as a special case of memory dependence, as registers can just be considered another type of memory. However, registers are changed far more often than memory, and so we would need to do things somewhat differently if we don't want to suffer a large performance hit. Also, the pairwise method may not be good enough, since 
 		
 		So we need to make some kind of tradeoff here. I think the right choice is to do dynamic dependence analysis, but keep it quite separate from memory dependence analysis. 
+		
+		
+		\subsubsection{Dependency checking for registers}
+		
+		Here is an algorithm, assuming we have $n$ registers:
+		
+		
 		
 		\subsection{Dependency collision function}
 		
