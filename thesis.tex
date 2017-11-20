@@ -431,7 +431,7 @@
 		
 		One extremely simple example of a massively parrellel algorithm is a vector addition. If you want to sum two vectors $a$ and $b$, by computing $c = a+b$, then the obvious algorithm is to take each $i$, and compute $c_i = a_i + b_i$. Since each of these operations is completely dependent on the others, this is a constant depth dependency graph. 
 		
-		One important example of a massively parrelell algorithm is summing. When you have an array $A_1,A_2,...,A_n$ of numbers and you sum them, you can get a log depth dependency graph with a divide and conquer algorithm like the following:
+		One important example of a massively parrelell algorithm is summing. When you have an array $A_1,A_2,...,A_n$ of numbers and you sum them, there are different ways to do it, some of which are parrelelizable, some of which are not. The most obvious sequential algorithm, computing $(A_1+(A_2+(A_3+...+A_n)))$ has a dependency graph of depth $n$. However, addition is associative, so we can rearrange the parenthesis like this: $(((A_1+A_2)+(A_3+A_4))+...(A_{n-1}+A_n))$ to give us a log depth dependency graph. Below are two algorithms that describe these methods.
 		
 		\begin{algorithm}
 			\caption{MassiveParrelelSum}\label{parellelsum}
@@ -454,9 +454,11 @@
 			\end{algorithmic}
 		\end{algorithm}
 		
-		However, the most obvious algorithm does not work like this at all. The standard algorithm, each dependence.
+		Now, this is bad since we have two algorithms to compute the same problem, but one of which is parrelizable, and one of which is not. And what allows us to do the transformation from one to the other depends on an algebraic quality that is true for many operations and procedures other than addition. For example subtraction is not associative, but repeated subtraction can have a similar transformation because you can take $\text{RepeatedSubtraction}(A) = -\text{Sum}(A)$, and then do the same log depth calculation with only one more step at the end. 
 		
-		For example, when summing an array, 
+		This general method of using divide and conquer to turn a linear depth operation into a log depth one is called a reduction, and is the basis of the MapReduce cluster computing paradigm. 
+		
+		Since these are important targets of parallelization, we will try our best to identify these cases, but it is most likely impossible to assess the possibility of this transformation automatically with perfect accuracy, so we will have to analyise actual cases. 
 		
 		\subsection{Reporting}
 		
@@ -466,14 +468,30 @@
 		
 		Because this is not the main point of the thesis, I will focus on making a good attempt to report the instruction locations of the conflict, and the number of times conflicts happen. But perfection is not necessary here.
 		
+		\subsubsection{Reporting List}
+		\begin{enumerate}
+			\item Whether a loop is parrelell
+			\item Number of bytes that conflict between iterations
+			\item Instructions that conflicts
+			\item etc.
+		\end{enumerate}
+		
 	\section{Pairwise method}
-		Note that any naive implemention of actually constructing a data dependence tree from a real computation will take $\Omega(n)$ space, where $n$ is the number of steps of the computation. Even for quick computations, this memory requirement quickly grows astronomical, and analysis becomes unusably slow. So instead, we will look at special cases and approximations to get what we need. 
+		Note that any naive implementation of actually constructing a data dependence tree from a real computation will take $\Omega(n)$ space, where $n$ is the number of steps of the computation. Even for quick computations, this memory requirement quickly grows beyond RAM capacities of normal machines, and analysis becomes unusably slow. So instead, we will look at special cases and approximations to get what we need. 
 	
 		The pairwise method is a approximation of data dependence analysis which has been developed to examine loop level parallelism. 
 		
 		Loop level parallelism is when one iteration of a loop is independent from the rest. This kind of parallelism is the main target of massively parallel architectures. Other types of parallelism, including parallel recursive calls and task parallelism are generally less important or less parrelelizable, than loop level parallelism. 
 		
 		The idea is to figure out if an iteration of a loop is independent from each other loop iteration. If this is the case, then we have the ability to 
+		
+		To prove that this always produces a correct answer to the problem, consider the each loop iteration to be a single computation in the graph. The memory addresses that are reads first are clearly inputs to this operation, and the output are writes. 
+		
+		So if any write of one iteration is read by another, then clearly, this dependency graph is not 1 depth, as the output of one operation is the input of another. 
+		
+		If the dependency graph is 1, then this means there was no reads of any data that was output in other iterations. 
+		
+		Note that this being true is critically dependnet on the killed bits operating correcty. After all, in the data dep
 		
 		%\subsection{Inaccuracy}
 		
@@ -488,46 +506,6 @@
 		
 		%This is clearly parallelizable, yet because the pairwise method focuses on memory locations instead of expressions and calculations, it will determine that this is a read-write dependency, and thus not parallelizable. 
 		
-		
-	
-		\subsection{Memory/Performance issues}
-		
-		Unfortunately, a naive implementation of the pairwise method can consume hundreds of times more memory than the executable code. 
-		
-		Each loop needs its own copy of all the accesses made by every instruction. This could mean in theory a $cmn$, where $c$ is the number of bytes needed to store the relevant info, (say 20, at least), $m$ is the number of instructions, and $n$ is the number of bytes of memory used by the executable program. 
-		
-		Of course, in practice it is quite a bit more efficient than this, since not every instruction will access every byte of memory, but it will still take up more memory than most computers can hold just to run basic benchmarks. \footnote{\cite{Kim:2010}}
-		
-		\subsection{Memory/Performance solutions}
-		
-		A solution to the memory problems of the pairwise method is stride based compression. The SD3 paper lays this out in some detail \footnote{\cite{Kim:2010}}
-		
-		\subsection{Data access compression}
-		
-		\subsubsection{Naive method}
-		
-		Build full dependency graph out in memory
-		
-	\section{SD$^3$ method}
-		
-		Since both  paper: \footnote{\cite{Kim:2010}}
-		
-		Doesn’t really work on all code/workloads (need backup system that works decently)
-		
-		Examples:
-		
-		Graph computations (simulations, network analysis)
-		
-		Non-trivial data structures (BST, hash tables)
-		
-		\subsubsection{More general access compression?}
-		
-		The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
-		
-		
-		Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
-		
-		Trick: We need to somehow do efficient computations on these things.
 		
 		
 		\subsection{Registers and Flags}
@@ -567,6 +545,43 @@ for(int i = 0; i < min_size(A,B); i++){
 		
 		Here is an algorithm, assuming we have $n$ registers:
 		
+		
+		
+		\subsection{Memory/Performance issues}
+		
+		Unfortunately, a naive implementation of the pairwise method can consume hundreds of times more memory than the executable code. 
+		
+		Each loop needs its own copy of all the accesses made by every instruction. This could mean in theory a $cmn$, where $c$ is the number of bytes needed to store the relevant info, (say 20, at least), $m$ is the number of instructions, and $n$ is the number of bytes of memory used by the executable program. 
+		
+		Of course, in practice it is quite a bit more efficient than this, since not every instruction will access every byte of memory, but it will still take up more memory than most computers can hold just to run basic benchmarks. \footnote{\cite{Kim:2010}}
+		
+	\section{Stride compression}
+
+		A solution to the memory problems of the pairwise method is stride based compression. The SD3 paper lays this out in some detail \footnote{\cite{Kim:2010}}
+		
+		\subsection{Goals of compressed algorithm}
+		The goal of any compression algorithm of this setting is to compute the things we want to report, without using excessive memory, and without decompression (as this would lead to much slower analysis).
+		
+		\subsection{SD$^3$ method}
+		
+		Since both  paper: \footnote{\cite{Kim:2010}}
+		
+		Doesn’t really work on all code/workloads (need backup system that works decently)
+		
+		Examples:
+		
+		Graph computations (simulations, network analysis)
+		
+		Non-trivial data structures (BST, hash tables)
+		
+		\subsubsection{More general access compression?}
+		
+		The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
+		
+		
+		Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
+		
+		Trick: We need to somehow do efficient computations on these things.
 		
 		
 		\subsection{Dependency collision function}
