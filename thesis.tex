@@ -368,24 +368,10 @@
 		For example, you can break the computation of $A+B+D+A\times B$ into a few steps like this
 		
 		\begin{algorithmic}[1]
-			%\Procedure{MyProcedure}{}
 			\State $D \gets A+B$
 			\State $E \gets A\times B$
 			\State $F \gets D+C$
 			\State $G \gets E+F$
-			%\State $i \gets \textit{patlen}$
-			%\If {$i > \textit{stringlen}$} \Return false
-			%\EndIf
-			%State $j \gets \textit{patlen}$
-			%\If {$\textit{string}(i) = \textit{path}(j)$}
-			%\State $j \gets j-1$.
-			%\State $i \gets i-1$.
-			%\State \textbf{goto} \emph{loop}.
-			%\State \textbf{close};
-			%\EndIf
-			%\State $i \gets i+\max(\textit{delta}_1(\textit{string}(i)),\textit{delta}_2(j))$.
-			%\State \textbf{goto} \emph{top}.
-			%\EndProcedure
 		\end{algorithmic}
 		
 		And then use these sub-operations to build the following dependency graph. 
@@ -402,13 +388,13 @@
 		\node[main node] (G) [right of=E] {$G$};
 		
 		\path[every node/.style={font=\sffamily\small}]
-		(A) edge [->] node [left] {} (C)
-		(B) edge [->] node [left] {} (C)
-		(A) edge [->] node [left] {} (F)
-		(B) edge [->] node [left] {} (F)
-		(F) edge [->] node [left] {} (E)
-		(E) edge [->] node [left] {} (G)
-		(C) edge [->] node [left] {} (G)
+		(A) [->] edge node [left] {} (C)
+		(B) [->] edge node [left] {} (C)
+		(A) [->] edge node [left] {} (F)
+		(B) [->] edge node [left] {} (F)
+		(F) [->] edge node [left] {} (E)
+		(E) [->] edge node [left] {} (G)
+		(C) [->] edge node [left] {} (G)
 		(D) [->] edge [bend right] node [left] {} (E);
 		\end{tikzpicture}
 		%edge [bend right] node[left] {} (2)
@@ -470,41 +456,107 @@
 		
 		\subsubsection{Reporting List}
 		\begin{enumerate}
-			\item Whether a loop is parrelell
+			\item Whether a loop is parallel
 			\item Number of bytes that conflict between iterations
 			\item Instructions that conflicts
 			\item etc.
 		\end{enumerate}
 		
 	\section{Pairwise method}
+		
 		Note that any naive implementation of actually constructing a data dependence tree from a real computation will take $\Omega(n)$ space, where $n$ is the number of steps of the computation. Even for quick computations, this memory requirement quickly grows beyond RAM capacities of normal machines, and analysis becomes unusably slow. So instead, we will look at special cases and approximations to get what we need. 
 	
 		The pairwise method is a approximation of data dependence analysis which has been developed to examine loop level parallelism. 
 		
-		Loop level parallelism is when one iteration of a loop is independent from the rest. This kind of parallelism is the main target of massively parallel architectures. Other types of parallelism, including parallel recursive calls and task parallelism are generally less important or less parrelelizable, than loop level parallelism. 
+		\subsection{Terminology}
+		\begin{itemize}
+			\item Loop iteration
+			\item Loop instance
+		\end{itemize}
 		
-		The idea is to figure out if an iteration of a loop is independent from each other loop iteration. If this is the case, then we have the ability to 
+		\subsection{Idea and inspiration}
 		
-		To prove that this always produces a correct answer to the problem, consider the each loop iteration to be a single computation in the graph. The memory addresses that are reads first are clearly inputs to this operation, and the output are writes. 
+		Loop level parallelism is when one iteration of a loop is independent from the rest. This kind of parallelism is the main target of massively parallel architectures. Other types of parallelism, including parallel recursive calls and task parallelism are generally less important or less parallelizable than loop level parallelism. 
+		
+		The idea is to figure out if an iteration of a loop is independent from each other loop iteration. If this is the case, then it clearly is highly parrelelizable. 
+		
+		The real reason why this is an important case is because it is very easy to measure, requiring very little memory and computation. Take the following loop:
+\begin{lstlisting}
+for(int i = 1; i < n; i++){
+	//operation 1
+	//operation 2
+	//operation 3
+	//...
+}
+\end{lstlisting}
+		
+		
+		To check if this code runs in parallel, we only need to keep track of two things:
+		
+		\begin{enumerate}
+			\item Which memory addresses have been written and read in the current loop iteration. Call this the pending table. 
+			\item Which memory addresses have been written and read in all of the previous loop iterations in the same instance. Call this the history table.
+			\item Which memory addresses in the current loop iteration that their first access was a write. Call this the killed addresses. 
+		\end{enumerate}
+		
+		So int the example above, say we were at operation 2 in iteration 30. So in other words, $i=30$, and we have executed operation 1. 
+		
+		Then we only need to keep track of which memory addresses were read and written in operation 1 in the current iteration, and the reads and writes of all the operations in each previous iteration, i.e. when $i < 30$. 
+		
+		So instead of having a memory requirement that scales with the size of the number of operations in the code, we have a memory requirement proportional to the amount of memory that the original app uses times the number of nested loops.
+		
+		\subsection{Implementation}
+		
+		The algorithm itself is quite simple:
+		
+		\begin{algorithm}
+			\caption{Pairwise-Method}\label{pairwise-method}
+			\begin{algorithmic}[1]
+				\State When you see a new loop, push it on the loop stack
+				\State On memory access
+				\If {is a write}
+				\State Check if it has already been read. If not, put this adress in the killed bits
+				\EndIf
+				\State When a memory address is accessed, check if it is a writeput it in the pending table
+				\State On iteration end, find conflicts between. 
+				\State 
+				\State 
+			\end{algorithmic}
+		\end{algorithm}
+		
+		\subsection{Correctness}
+		
+		To prove that this always produces a correct answer to the problem, consider the each loop iteration to be a single computation in the graph. The memory addresses that are reads first are clearly inputs to this operation, and the output are writes. Memory addresses that are written before being read are not inputs, and so should not be counted as such. 
 		
 		So if any write of one iteration is read by another, then clearly, this dependency graph is not 1 depth, as the output of one operation is the input of another. 
 		
-		If the dependency graph is 1, then this means there was no reads of any data that was output in other iterations. 
+		If the dependency graph is depth 1, then this means there was no reads of any data that was output in other iterations. 
 		
-		Note that this being true is critically dependnet on the killed bits operating correcty. After all, in the data dep
+		So this method works if every loop is independent from every other loop. 
 		
-		%\subsection{Inaccuracy}
+		Unfortunately, this method does not guarantee any good results if there is any dependence whatsoever in between loops for example, the following loop has a dependency graph depth of two. 
 		
-		%This method is not a perfect calculation of parallelism. Lets look at the following code for a counterexample:
+\begin{lstlisting}
+for(int i = n; i < 3n; i++){
+	A[i] = A[i-n]+1;
+}
+\end{lstlisting}
+
+		To see why its dependency graph is so small, note that you can simply break this into two loops, one from $i = [n,2n-1]$, and $i=[2n,3n-1]$, and in both loops, simply compute the answer in parallel. 
+
+		However, the pairwise method simply returns that all of the iterations after $i \ge 2n$ are not parallelizable, as they conflict with the memory addresses in some previous iteration. This is a direct consequence of the memory saving property of the pairwise method, so this problem is not solvable by this method.  
 	
+		\subsection{Collecting additional information}
+		
+		As mentioned before, we will want not only report a binary parallel/not parallel, but also collect some fairly substantial additional information. In particular, we care about which instruction the dependencies came from. 
+		
+		So in addition to storing information about which memory accesses are reads and writes, we will also need to store the instruction each read and write came from. One way to implement this is to store a set of memory reads and writes for each instruction. 
 %\begin{lstlisting}
 %for(int i = 0; i < n; i++){
 %	B[i] = A[i-1];
 %	A[i] = C[i];
 %}
 %\end{lstlisting}
-		
-		%This is clearly parallelizable, yet because the pairwise method focuses on memory locations instead of expressions and calculations, it will determine that this is a read-write dependency, and thus not parallelizable. 
 		
 		
 		
@@ -536,22 +588,16 @@ for(int i = 0; i < min_size(A,B); i++){
 		
 		Static analysis would mean introducing new tools to our project, and even static analysis may yield false negatives of parallelism (due to branching dependences). 
 		
-		Dynamic analysis of registers could be easily implemented as a special case of memory dependence, as registers can just be considered another type of memory. However, registers are changed far more often than memory, and so we would need to do things somewhat differently if we don't want to suffer a large performance hit. Also, the pairwise method may not be good enough, since 
+		Dynamic analysis of registers could be easily implemented as a special case of memory dependence, as registers can just be considered another type of memory. However, registers are changed far more often than memory, and so we would need to do things somewhat differently if we don't want to suffer a large performance hit. 
 		
-		So we need to make some kind of tradeoff here. I think the right choice is to do dynamic dependence analysis, but keep it quite separate from memory dependence analysis. 
-		
-		
-		\subsubsection{Dependency checking for registers}
-		
-		Here is an algorithm, assuming we have $n$ registers:
-		
+		So we need to make some kind of tradeoff here. I think the right choice is to do dynamic dependence analysis, but keep it somewhat separate from memory dependence analysis. 
 		
 		
 		\subsection{Memory/Performance issues}
 		
 		Unfortunately, a naive implementation of the pairwise method can consume hundreds of times more memory than the executable code. 
 		
-		Each loop needs its own copy of all the accesses made by every instruction. This could mean in theory a $cmn$, where $c$ is the number of bytes needed to store the relevant info, (say 20, at least), $m$ is the number of instructions, and $n$ is the number of bytes of memory used by the executable program. 
+		Each loop needs its own copy of all the accesses made by every instruction. This could mean in theory a $cmn$, where $c$ is the number of bytes needed to store the relevant info, (say 20, at least), $m$ is the number of instructions, and $n$ is the number of bytes of memory used by the executable program. Then we also need to store the instruction of each access, which makes it worse. 
 		
 		Of course, in practice it is quite a bit more efficient than this, since not every instruction will access every byte of memory, but it will still take up more memory than most computers can hold just to run basic benchmarks. \footnote{\cite{Kim:2010}}
 		
@@ -564,7 +610,18 @@ for(int i = 0; i < min_size(A,B); i++){
 		
 		\subsection{SD$^3$ method}
 		
-		Since both  paper: \footnote{\cite{Kim:2010}}
+		\subsubsection{Detecting presence of strides}
+		\subsubsection{Compressing strides}
+		\subsubsection{Conflicts between strides}
+		\subsubsection{Killed points and strides}
+		
+		\subsection{Dependency collision function}
+		
+		\subsection{Kill bit collision function}
+		
+		\subsection{Bit calculation performance optimization}
+		
+		\subsection{Bad cases of stride compression}
 		
 		Doesn’t really work on all code/workloads (need backup system that works decently)
 		
@@ -574,23 +631,14 @@ for(int i = 0; i < min_size(A,B); i++){
 		
 		Non-trivial data structures (BST, hash tables)
 		
-		\subsubsection{More general access compression?}
+		%\subsubsection{More general access compression?}
 		
-		The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
-		
-		
-		Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
-		
-		Trick: We need to somehow do efficient computations on these things.
+		%The innermost loop may not have striding access, but the non-striding access may be similar to its own behavior in a previous iteration of a larger loop (for instance in a graph computation where it iterates over all the edges of a vertex in each iteration of a loop). 
 		
 		
-		\subsection{Dependency collision function}
+		%Idea: We can see all accesses of data as the set of permutations of memory addresses. We know that there are patterns in accesses. We can make a general purpose compression of memory accesses, where the stride compression is a special case of. 
 		
-		\subsection{Kill bit collision function}
-		
-		\subsection{Bit calculation performance optimization}
-		
-		
+		%Trick: We need to somehow do efficient computations on these things.
 		
 	\section{Stride compression}
 		
