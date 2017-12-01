@@ -358,12 +358,21 @@
 	\end{itemize}
 
 \chapter{Dynamic parallelism detection}
+	\section{Motivation}
+		Recall that one of the most important things to establish about the program is whether it can in theory run in parallel. This is a very important factor in determining a program's hardware matchup. 
+		
+		One problem is that there are no good open source tools for determining theoretical parallelism in real code. So we will have to create one ourselves. 
+	
 	\section{Data Dependency graphs}
 		So how might you detect parallelism? To do that, you have to have a mathematical model of what parallelism is. 
 		
-		Our model is a dependency graph. 
+		Our model is a data dependency graph. 
 		
-		The idea is that we can take a computation and build a directed acyclic graph like so. There are the input nodes $\{i_1,...,i_n\}$. Each operation is a computation node node in the graph that is pointed to by its inputs. Some of those computation nodes are the outputs. Any node that does not have a path to the outputs is not a valid node. This is a directed acyclic graph because in a computation, no sub-computation can depend on itself. 
+		The idea is that we can take a computation and build a directed acyclic graph like so.  
+		
+		The inputs to the computation are nodes $I \subset V$. These can be thought of as blocks of memory stored before the computation starts. Each step of the computation produces a temporary value $c \in V$. There is an edge $(u,v)$ whenever an input to $u$ is the data calculated by $v$. Then some nodes are designated outputs, which are the data we wished to calculate. 
+		
+		This is a directed acyclic graph because in a computation, no sub-computation can use data that hasn't been calculated yet, including the data output by its own computation.
 		
 		For example, you can break the computation of $A+B+D+A\times B$ into a few steps like this
 		
@@ -379,13 +388,13 @@
 		\begin{tikzpicture}[auto, node distance=3cm, every loop/.style={},
 		thick,main node/.style={circle,draw,font=\sffamily\Large\bfseries}]
 		
-		\node[main node] (A) {$A$};
-		\node[main node] (B) [below of=A] {$B$};
+		\node[main node] [fill=red] (A) {$A$};
+		\node[main node] [fill=red] (B) [below of=A] {$B$};
 		\node[main node] (C) [right of=B] {$E$};
-		\node[main node] (D) [below of=B] {$C$};
+		\node[main node] [fill=red] (D) [below of=B] {$C$};
 		\node[main node] (F) [right of=A] {$D$};
 		\node[main node] (E) [right of=F] {$F$};
-		\node[main node] (G) [right of=E] {$G$};
+		\node[main node] [fill=green] (G) [right of=E] {$G$};
 		
 		\path[every node/.style={font=\sffamily\small}]
 		(A) [->] edge node [left] {} (C)
@@ -397,17 +406,6 @@
 		(C) [->] edge node [left] {} (G)
 		(D) [->] edge [bend right] node [left] {} (E);
 		\end{tikzpicture}
-		%edge [bend right] node[left] {} (2)
-		%edge [loop above] node {} (1)
-		%(2) edge node [right] {} (1)
-		%edge node {} (4)
-		%edge [loop left] node {} (2)
-		%edge [bend right] node[left] {0.1} (3)
-		%(3) edge node [right] {0.8} (2)
-		%edge [bend right] node[right] {0.2} (4)
-		%(4) edge node [left] {0.2} (3)
-		%edge [loop right] node {0.6} (4)
-		%edge [bend right] node[right] {0.2} (1);
 		
 		Hopefully you can see that this is an intuitive framework to examine parrelelizability. In the example above, nodes $D$ and $E$ can be run in parallel since neither depend on the other. $F$ can also be run in parallel with $E$, but not with $D$, since it depends on $D$ already being calculated. $G$ can only be run after all other steps are finished, as it recursively depends on $D,E$, and $F$. 
 		
@@ -415,9 +413,9 @@
 		
 		The most important kind of parallelism, and the only kind we will care about is massive parallelism. Massive parallelism is defined to be any computation where the depth of the dependency graph is logarithmic in the size of the input. 
 		
-		One extremely simple example of a massively parrellel algorithm is a vector addition. If you want to sum two vectors $a$ and $b$, by computing $c = a+b$, then the obvious algorithm is to take each $i$, and compute $c_i = a_i + b_i$. Since each of these operations is completely dependent on the others, this is a constant depth dependency graph. 
+		One extremely simple example of a massively parallel algorithm is a vector addition. If you want to sum two vectors $a$ and $b$, by computing $c = a+b$, then the obvious algorithm is to take each $i$, and compute $c_i = a_i + b_i$. Since each of these operations is completely dependent on the others, this is a constant depth dependency graph. 
 		
-		One important example of a massively parrelell algorithm is summing. When you have an array $A_1,A_2,...,A_n$ of numbers and you sum them, there are different ways to do it, some of which are parrelelizable, some of which are not. The most obvious sequential algorithm, computing $(A_1+(A_2+(A_3+...+A_n)))$ has a dependency graph of depth $n$. However, addition is associative, so we can rearrange the parenthesis like this: $(((A_1+A_2)+(A_3+A_4))+...(A_{n-1}+A_n))$ to give us a log depth dependency graph. Below are two algorithms that describe these methods.
+		One important example of a massively parallel algorithm is summing. When you have an array $A_1,A_2,...,A_n$ of numbers and you sum them, there are different ways to do it, some of which are parrelelizable, some of which are not. The most obvious sequential algorithm, computing $(A_1+(A_2+(A_3+...+A_n)))$ has a dependency graph of depth $n$. However, addition is associative, so we can rearrange the parenthesis like this: $(((A_1+A_2)+(A_3+A_4))+...(A_{n-1}+A_n))$ to give us a log depth dependency graph. Below are two algorithms that describe these methods.
 		
 		\begin{algorithm}
 			\caption{MassiveParrelelSum}\label{parellelsum}
@@ -509,18 +507,21 @@ for(int i = 1; i < n; i++){
 		
 		The algorithm itself is quite simple:
 		
+		You just need 4 core operations, and the rest is straightforward:
+		
+		\begin{enumerate}
+			\item Add a new memory access to the pending tables, considering killed bits of current loop iteration
+			\item Merge in the historytable from a nested loop into the pendingtable of the current loop. When doing so, remove the killed addresses, and add the addresses that have been written to the killed addresses set. 
+			\item Merge in pending table into history table, finding access conflicts between the two. 
+		\end{enumerate}
+		
 		\begin{algorithm}
 			\caption{Pairwise-Method}\label{pairwise-method}
 			\begin{algorithmic}[1]
 				\State When you see a new loop, push it on the loop stack
-				\State On memory access
-				\If {is a write}
-				\State Check if it has already been read. If not, put this adress in the killed bits
-				\EndIf
-				\State When a memory address is accessed, check if it is a writeput it in the pending table
-				\State On iteration end, find conflicts between. 
-				\State 
-				\State 
+				\State On memory access, \textsc{ADD}
+				\State On loop iteration end \textsc{MERGE PEND HIST}
+				\State On loop instance end \textsc{MERGE HIST PEND}
 			\end{algorithmic}
 		\end{algorithm}
 		
@@ -557,8 +558,6 @@ for(int i = n; i < 3n; i++){
 %	A[i] = C[i];
 %}
 %\end{lstlisting}
-		
-		
 		
 		\subsection{Registers and Flags}
 		Unfortunately, memory locations are no the only source of possible memory dependencies. There are also registers.
@@ -608,11 +607,34 @@ for(int i = 0; i < min_size(A,B); i++){
 		\subsection{Goals of compressed algorithm}
 		The goal of any compression algorithm of this setting is to compute the things we want to report, without using excessive memory, and without decompression (as this would lead to much slower analysis).
 		
+		\subsection{SD3 data structures}
+		
+		In general, the history table and the pending table are one type: call this the CompressedAccessTable type
+		
+		In SD3, this is split in two different tables, a StrideTable for strides, and one for accesses which do not follow a stride pattern. Call these non-stride accesses points, and the table which stores them the PointTable. 
+		
+		The StrideTable is a conceptually a set of strides for each instruction. To accelerate detecting conflicts, there is a connected structure that is an interval tree linking to each stride, instruction pair. 
+		
+		The PointTable is a set of instructions at each memory address that has been accessed.
+		
+		Note that while both tables enough information to get pairs of addresses, and the instructions involved, they have quite different performance characteristics, optimized to fit certain data structures, and the operations described below.
+		
 		\subsection{SD$^3$ method}
 		
-		\subsubsection{Detecting presence of strides}
-		\subsubsection{Compressing strides}
-		\subsubsection{Conflicts between strides}
+		\subsubsection{Stride detection on new memory accesses}
+		
+		When a memory address is accessed, the program decides if the access is part of a stride using an an on-line algorithm. If that algorithm returns true, then a singleton stride is immediately put in the stridetable. 
+		
+		\subsubsection{Compressing/merging strides}
+		
+		As singleton strides are the only kind being added to the stridetable directly, then we really need a way to join these strides together. 
+		
+		This is done using another interval tree at the instruction level. 
+		
+		\subsubsection{Finding overlap}
+		
+		To 
+		
 		\subsubsection{Killed points and strides}
 		
 		\subsection{Dependency collision function}
@@ -669,6 +691,7 @@ for(int i = 0; i < min_size(A,B); i++){
 		But how do we find the exact number of dependencies and where they are? What do we do about killed bits in this context (since this can lead to really awkward strides)? 
 		
 		So instead of carefully dealing with abnormal strides like this slowly and carefully, I will instead just make basic checks, and then assume the worst case, whatever that may be in this context. 
+			
 
 \chapter{The First}
   	This is the first page of the first chapter. You may delete the contents of this chapter so you can add your own text; it's just here to show you some examples. 

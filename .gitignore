@@ -11,6 +11,7 @@
 *.cb
 *.cb2
 SD3
+LoopProf
 
 ## Intermediate documents:
 *.dvi
