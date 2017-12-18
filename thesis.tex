@@ -693,59 +693,6 @@ for(int i = 0; i < min_size(A,B); i++){
 		So instead of carefully dealing with abnormal strides like this slowly and carefully, I will instead just make basic checks, and then assume the worst case, whatever that may be in this context. 
 			
 
-\chapter{The First}
-
-	And this is how you add a figure with a graphic:
-	\begin{figure}[h]
-	% the options are h = here, t = top, b = bottom, p = page of figures.
-	% you can add an exclamation mark to make it try harder, and multiple
-	% options if you have an order of preference, e.g.
-	% \begin{figure}[h!tbp]
-	   
-	       \centering
-	    % DO NOT ADD A FILENAME EXTENSION TO THE GRAPHIC FILE
-	    \includegraphics{subdivision}
-	     \caption{A Figure}
-	 \label{subd}
-	\end{figure}
-
-\clearpage %% starts a new page and stops trying to place floats such as tables and figures
-
-\section{More Figure Stuff}
-You can also scale and rotate figures.
- 	\begin{figure}[h!]
-	   
-	       \centering
-	    % DO NOT ADD A FILENAME EXTENSION TO THE GRAPHIC FILE
-	    \includegraphics[scale=0.5,angle=180]{subdivision}
-	    % if your figure shows up not where you want it, it may just be too big to fit. You can use the scale argument to shrink it, e.g. scale=0.85 is 85 percent of the original size. 
-	     \caption{A Smaller Figure, Flipped Upside Down}
-	 \label{subd2}
-	\end{figure}
-
-\section{Even More Figure Stuff}
-With some clever work you can crop a figure, which is handy if (for instance) your EPS or PDF is a little graphic on a whole sheet of paper. The viewport arguments are the lower-left and upper-right coordinates for the area you want to crop.
-
- 	\begin{figure}[h!]
-	    	       \centering
-	    % DO NOT ADD A FILENAME EXTENSION TO THE GRAPHIC FILE
-	   \includegraphics[clip=true, viewport=.0in .0in 1in 1in]{subdivision}
-	    \caption{A Cropped Figure}
-	 \label{subd3}
-	\end{figure}
-	
-      \subsection{Common Modifications}
-      The following figure features the more popular changes thesis students want to their figures. This information is also on the web at \url{web.reed.edu/cis/help/latex/graphics.html}.
-    %\renewcommand{\thefigure}{0.\arabic{figure}} 	% Renumbers the figure to the type 0.x
-    %\addtocounter{figure}{4} 						% starts the figure numbering at 4
-    \begin{figure}[htbp]
-    \begin{center}
-   \includegraphics[scale=0.5]{subdivision}
-    \caption[Subdivision of arc segments]{\footnotesize{Subdivision of arc segments. You can see that $ p_3 = p_6^\prime$.}} %the special ToC caption is in square brackets. The \footnotesize makes the figure caption smaller
-    \label{barplot}
-    \end{center}
-    \end{figure} 
-
 \chapter*{Conclusion}
          \addcontentsline{toc}{chapter}{Conclusion}
 	\chaptermark{Conclusion}
@@ -756,9 +703,6 @@ With some clever work you can crop a figure, which is handy if (for instance) yo
 Here's a conclusion, demonstrating the use of all that manual incrementing and table of contents adding that has to happen if you use the starred form of the chapter command. The deal is, the chapter command in \LaTeX\ does a lot of things: it increments the chapter counter, it resets the section counter to zero, it puts the name of the chapter into the table of contents and the running headers, and probably some other stuff. 
 
 So, if you remove all that stuff because you don't like it to say ``Chapter 4: Conclusion'', then you have to manually add all the things \LaTeX\ would normally do for you. Maybe someday we'll write a new chapter macro that doesn't add ``Chapter X'' to the beginning of every chapter title.
-
-\section{More info}
-And here's some other random info: the first paragraph after a chapter title or section head \emph{shouldn't be} indented, because indents are to tell the reader that you're starting a new paragraph. Since that's obvious after a chapter or section title, proper typesetting doesn't add an indent there. 
 
 
 %If you feel it necessary to include an appendix, it goes here.
