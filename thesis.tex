@@ -571,7 +571,7 @@ for(int i = n; i < 3n; i++){
 cary = 0
 for(int i = 0; i < min_size(A,B); i++){
 	R[i] = A[i] + B[i] + cary;
-	if(overflow_flag){
+	if(register_overflowed(A[i] + B[i] + cary)) {
 		cary = 1
 	}
 	else{
@@ -583,7 +583,7 @@ for(int i = 0; i < min_size(A,B); i++){
 		
 		The first thing to note is that in the worst case, you cannot write to any element of $R_i$ before reading every element of $A$ and $B$ before $i$. So it is not parrelelizable in this case. In practice, it will be somewhat parrelelizable, since that case can safely be assumed to be rare. But a memory-only pairwise method will see that this loop is trivially parrelelizable. On the other hand, looking at the registers, there is a clear read-after-write conflict. 
 		
-		Some papers ignore this case, as register dependencies can be analyzed statically.\footnote{\cite{Chen:2004}} However,for our uses, we need to know about register dependencies, and so we need to do this either statically or dynamically. 
+		Some papers ignore this case, as register dependencies can be analyzed statically.\footnote{\cite{Chen:2004}} However, for our uses, we need to know about register dependencies, and so we need to do this either statically or dynamically. 
 		
 		Static analysis would mean introducing new tools to our project, and even static analysis may yield false negatives of parallelism (due to branching dependences). 
 		
