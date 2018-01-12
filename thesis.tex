@@ -571,7 +571,7 @@ for(int i = n; i < 3n; i++){
 cary = 0
 for(int i = 0; i < min_size(A,B); i++){
 	R[i] = A[i] + B[i] + cary;
-	if(overflow_flag){
+	if(register_overflowed(A[i] + B[i] + cary)) {
 		cary = 1
 	}
 	else{
@@ -583,7 +583,7 @@ for(int i = 0; i < min_size(A,B); i++){
 		
 		The first thing to note is that in the worst case, you cannot write to any element of $R_i$ before reading every element of $A$ and $B$ before $i$. So it is not parrelelizable in this case. In practice, it will be somewhat parrelelizable, since that case can safely be assumed to be rare. But a memory-only pairwise method will see that this loop is trivially parrelelizable. On the other hand, looking at the registers, there is a clear read-after-write conflict. 
 		
-		Some papers ignore this case, as register dependencies can be analyzed statically.\footnote{\cite{Chen:2004}} However,for our uses, we need to know about register dependencies, and so we need to do this either statically or dynamically. 
+		Some papers ignore this case, as register dependencies can be analyzed statically.\footnote{\cite{Chen:2004}} However, for our uses, we need to know about register dependencies, and so we need to do this either statically or dynamically. 
 		
 		Static analysis would mean introducing new tools to our project, and even static analysis may yield false negatives of parallelism (due to branching dependences). 
 		
@@ -605,19 +605,8 @@ for(int i = 0; i < min_size(A,B); i++){
 		A solution to the memory problems of the pairwise method is stride based compression. The SD3 paper lays this out in some detail \footnote{\cite{Kim:2010}}
 		
 		\subsection{Goals of compressed algorithm}
-		The goal of any compression algorithm of this setting is to compute the things we want to report, without using excessive memory, and without decompression (as this would lead to much slower analysis).
+		The goal of any compression algorithm of this setting is to compute the basic steps of the pairwise method as accurately and quickly as possible, without using excessive memory. The time performance goal will means that we want a method that does not involve decompression if possible, as operating on compressed structures promises to be faster than decompression. 
 		
-		\subsection{SD3 data structures}
-		
-		In general, the history table and the pending table are one type: call this the CompressedAccessTable type
-		
-		In SD3, this is split in two different tables, a StrideTable for strides, and one for accesses which do not follow a stride pattern. Call these non-stride accesses points, and the table which stores them the PointTable. 
-		
-		The StrideTable is a conceptually a set of strides for each instruction. To accelerate detecting conflicts, there is a connected structure that is an interval tree linking to each stride, instruction pair. 
-		
-		The PointTable is a set of instructions at each memory address that has been accessed.
-		
-		Note that while both tables enough information to get pairs of addresses, and the instructions involved, they have quite different performance characteristics, optimized to fit certain data structures, and the operations described below.
 		
 		\subsection{SD$^3$ method}
 		
@@ -631,17 +620,86 @@ for(int i = 0; i < min_size(A,B); i++){
 		
 		This is done using another interval tree at the instruction level. 
 		
+		
 		\subsubsection{Finding overlap}
 		
 		To 
 		
 		\subsubsection{Killed points and strides}
 		
-		\subsection{Dependency collision function}
+		%\subsection{SD3 data structures}
 		
-		\subsection{Kill bit collision function}
+		%Is this really needed?
 		
-		\subsection{Bit calculation performance optimization}
+		%\subsubsection{PC table of interval trees for merging}
+		%\subsubsection{Memory interval tree for conflict-checking and address killing}
+		
+		%In general, the history table and the pending table are one type: call this the CompressedAccessTable type
+		
+		%In SD3, this is split in two different tables, a StrideTable for strides, and one for accesses which do not follow a stride pattern. Call these non-stride accesses points, and the table which stores them the PointTable. 
+		
+		%The StrideTable is a conceptually a set of strides for each instruction. To accelerate detecting conflicts, there is a connected structure that is an interval tree linking to each stride, instruction pair. 
+		
+		%The PointTable is a set of instructions at each memory address that has been accessed.
+		
+		%Note that while both tables enough information to get pairs of addresses, and the instructions involved, they have quite different performance characteristics, optimized to fit certain data structures, and the operations described below.
+		
+		\subsection{My Stride compression method}
+		
+		Stride detection on new memory accesses is the same. Finding overlap between two different strides is basically the same (except doesn't use dynamic-gcd).
+		
+		\subsubsection{Compressing/merging strides}
+		
+		Here we use a totally different data structure for stride merging.
+		\begin{verbatim}
+		unordered_map<instruc_addr,
+		    unordered_map<pair<stride_len,access_size>,
+		        map<stride_start,Stride>>>
+		\end{verbatim}
+		This is the data structure that is held at all times in the pending and history table. 
+		
+		And then the obvious algorithm to add in new strides, while combining that with overlapping or adjacent strides with same instruction, stride-len and access-size.
+		
+		Unlike SD3, this data structure will always merge mergable strides, so there is no need for caching results. 
+		
+		\subsubsection{Finding overlap}
+		
+		Unlike SD3, Strides and Points are both treated as intervals when finding overlap (in SD3, points are memory locations in a hash table). 
+		
+		When finding exact overlap between history tables and pending tables, it builds a sorted list of points and strides.
+		
+		Then it does interval checking using the following linear time algorithm:
+		
+		\begin{verbatim}
+		check_overlap(A,B)
+		    sort A by first()
+		    sort B by first()
+		    overlap = Set()
+		    before_last = vector()
+		    ib = 0
+		    for interval in A
+		        new_before_last = vector()
+		        for item in before_last:
+		            if item.last() >= interval.first():
+		                new_before_last.append(item)
+		                swap(before_last,new_before_last)
+		
+		        increment ib until B[ib].first() >= interval.first()
+		        if B[ib].last() >= interval.first()
+		            before_last.append(B[ib])
+		
+		        for bl in before_last
+		            overlap.add(bl,interval)
+		
+		        for ib2 from ib until B[ib2].first() > interval.last()
+		            overlap.add(B[ib2],interval)
+		\end{verbatim}
+		
+		\subsubsection{Killed points and strides}
+		
+		Written, read, and killed addresses are kept track via a single loop level compressed bit-set. Merged points and strides are compared with this map in order to eliminate killed accesses. 
+		
+		Points and strides are not guaranteed to be killed if only part of the memory region they cover has been killed. 
 		
 		\subsection{Bad cases of stride compression}
 		
@@ -691,7 +749,40 @@ for(int i = 0; i < min_size(A,B); i++){
 		But how do we find the exact number of dependencies and where they are? What do we do about killed bits in this context (since this can lead to really awkward strides)? 
 		
 		So instead of carefully dealing with abnormal strides like this slowly and carefully, I will instead just make basic checks, and then assume the worst case, whatever that may be in this context. 
-			
+		
+	\section{Bit set compression}
+		
+		Now, instead of using the common paradigm of strides to compress data, there is another way: 
+		
+		\subsection{Bit-compressed set design}
+		
+		A process's allocated memory locations are sparse across the 64 bit address space, but dense locally. To take full advantage of that, the set is a map (binary search tree) of the different upper 56 bits that are accessed, and if a particular value is  the value any bits set in the lower 8 bits are stored in a bitmap. 
+		
+		so really
+		
+		\begin{verbatim}
+		map<upper_56,bitmap<256>>
+		\end{verbatim}
+		
+		
+		\subsection{Note on performance of BSTs vs Hash tables}
+		
+		I ended up with BSTs rather than hash tables because of two reasons
+		\begin{enumerate}
+			\item BSTs tend to be more memory efficient and faster on extremely small sets, like of size 1 or 2. This is important for the algorithm on inner loops. 
+			\item BSTs allow intersect checking in sub-linear time in typical cases.
+		\end{enumerate}
+	
+		
+		
+	\subsection{Bit-Compressed Conflict-check algorithm}
+		
+		\subsection{General idea}
+		
+		\subsection{Implementation}
+		
+		\subsection{Efficiency}
+		
 
 \chapter*{Conclusion}
          \addcontentsline{toc}{chapter}{Conclusion}
