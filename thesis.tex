@@ -369,6 +369,57 @@
 	\end{itemize}
 
 \chapter{Dynamic parallelism detection}
+
+	\section{Terminology}
+	
+		\begin{itemize}
+			\item Loop iteration: ???
+			\item 
+			\item Loop instance
+		\end{itemize}
+	\section{Parallel and non-parallel algorithms}
+		
+		Here is a vector-scalar multiply procedure. 
+		
+		\begin{lstlisting}
+for(int i = 0; i < n; i++){
+	B[i] = B[i] * 2;
+}
+		\end{lstlisting}
+		
+		The above procedure is loop parallel, because every iteration is independent from every other iteration. In other words, you can compute this loop given any ordering of \texttt{i}.
+		
+		
+		Here is a cumulative sum algorithm. 
+	
+		\begin{lstlisting}
+for(int i = 1; i < n; i++){
+	B[i] = B[i-1] + A[i];
+}
+		\end{lstlisting}
+		
+		This procedure is not loop-parallel. It needs to compute \texttt{B[i-1]} before it can calculate \texttt{B[i]}. 
+		
+		%Now, there a massively parallel algorithm that does compute the same answer. However, we will not concern ourselves with this because it is impossible to detect this in general. The algorithm choice will still need to be made by hand. Rather, we want to be able to detect whether the particular algorithm is 
+		
+	\section{Dependency graphs}
+	
+		In order to create an algorithm that detects loop parallelism, we will have to formalize the notion of loops being independent.
+		
+		The formal notion is simple. Two procedures can run in parallel if neither uses input from the other.
+		
+	\section{Pairwise method}
+		 
+		Building and analyzing full dependency graphs is completely impractical for longer running programs. The reason is that you need to store every input location of every instruction, so the memory consumption increases linearly with running time (with bad constants). 
+		
+		So instead of tracing exact dependencies, we will look at inputs of the entire loop iteration, and see if they were produced by any output in all previous iterations of the loop instance. 
+		
+		In order to do this formally, we will need 
+		 history-tables, pending tables, and killed bits. 
+		
+		
+		
+	
 	\section{Motivation}
 		Recall that one of the most important things to establish about the program is whether it can in theory run in parallel. This is a very important factor in determining a program's hardware matchup.
 
