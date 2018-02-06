@@ -370,43 +370,81 @@
 
 \chapter{Dynamic parallelism detection}
 
-	\section{Terminology}
+	\section{Introduction}
+		We need a way of determining parallelism in order to do any useful inference on hardware compatibility. But, also recall that our end goals are much larger than just that. We are looking at a wide vision of a tool that helps the programmer understand their code, and help them to improve the algorithms and prototype them for better fitness on different hardware without actually dealing with the hardware. So we not only want a parallelism tool that figures out which parts of the code can be parallelized or not, but a tool that helps the programmer understand why code might not be parallelizable, and perhaps how to fix it. 
+		 
+		We came to the conclusion that current open source parallelism detection tools do not meet our efficiency and accuracy requirements, and so we built our own tool which does meet our needs. 
+		
+	\section{Prior methods}
+	\section{Loop level parallelism and the base algorithm}
 	
+		We will be entirely focused on  detecting a single type of parallelism: loop level parallelism. This type of parrleleism is easy to detect, and common in real code. 
+		
+		\subsection{Formalizing parrelelism}
+			
+			In order to create an algorithm that detects loop parallelism, we will have to formalize the notion of loops being independent.
+			
+			The formal notion is simple. Two procedures can run in parallel if neither uses input which is produced as output from the other.
+			
+		\subsection{What is loop level parrelelism}
+		
+			Loop level parrelelism occurs when each iteration of the loop can be run in parrellel with all the other iterations. 
+		
+			Here is a vector-scalar multiply procedure. 
+			
+			\begin{lstlisting}
+for(int i = 0; i < n; i++){
+	B[i] = B[i] * 2;
+}
+			\end{lstlisting}
+			
+			The above procedure is loop parallel, because every iteration is independent from every other iteration. In other words, you can compute this loop given any ordering of \texttt{i}.
+			
+			
+			Here is a cumulative sum algorithm. 
+			
+			\begin{lstlisting}
+for(int i = 1; i < n; i++){
+	B[i] = B[i-1] + A[i];
+}
+			\end{lstlisting}
+			
+			This procedure is not loop-parallel. It needs to compute \texttt{B[i-1]} before it can calculate \texttt{B[i]}. 
+			
+		\subsection{The pairwise method}
+			
+			The baseline algorithm we use for detecting loop level parrelelism is called the pairwise method. It 
+			
+	\section{Performance and memory issues with the pairwise method}
+	\section{Implementation of Stride and bitwise method}
+	\section{Memory and performance problems}
+	
+		
+			
+		
+
+	\section{Need for a new dynamic parallelism detection tool}
+	
+		\begin{itemize}
+			\item Reminder: need to detect parallelism to determine hardware compatibility
+			\item Static parallel detection is not good enough
+			\item No sufficiently good open source dynamic parallelism tool
+		\end{itemize}
+	
+		
+		
+		%Now, there a massively parallel algorithm that does compute the same answer. However, we will not concern ourselves with this because it is impossible to detect this in general. The algorithm choice will still need to be made by hand. Rather, we want to be able to detect whether the particular algorithm is 
+		
+	\section{Terminology}
+		
 		\begin{itemize}
 			\item Loop iteration: ???
 			\item 
 			\item Loop instance
 		\end{itemize}
-	\section{Parallel and non-parallel algorithms}
-		
-		Here is a vector-scalar multiply procedure. 
-		
-		\begin{lstlisting}
-for(int i = 0; i < n; i++){
-	B[i] = B[i] * 2;
-}
-		\end{lstlisting}
-		
-		The above procedure is loop parallel, because every iteration is independent from every other iteration. In other words, you can compute this loop given any ordering of \texttt{i}.
-		
-		
-		Here is a cumulative sum algorithm. 
 	
-		\begin{lstlisting}
-for(int i = 1; i < n; i++){
-	B[i] = B[i-1] + A[i];
-}
-		\end{lstlisting}
-		
-		This procedure is not loop-parallel. It needs to compute \texttt{B[i-1]} before it can calculate \texttt{B[i]}. 
-		
-		%Now, there a massively parallel algorithm that does compute the same answer. However, we will not concern ourselves with this because it is impossible to detect this in general. The algorithm choice will still need to be made by hand. Rather, we want to be able to detect whether the particular algorithm is 
-		
 	\section{Dependency graphs}
 	
-		In order to create an algorithm that detects loop parallelism, we will have to formalize the notion of loops being independent.
-		
-		The formal notion is simple. Two procedures can run in parallel if neither uses input which is produced as output from the other.
 		
 	\section{Pairwise method}
 		 
@@ -414,8 +452,16 @@ for(int i = 1; i < n; i++){
 		
 		So instead of tracing exact dependencies, we will look at inputs of the entire loop iteration, and see if they were produced by any output in all previous iterations of the loop instance. 
 		
-		In order to do this formally, we will need 
-		 history-tables, pending tables, and killed bits. 
+		In order to do this formally, we will need to introduce 3 concepts:
+		
+		Each loop has the following
+		\begin{itemize}
+			\item history table: A table of reads and writes of previous loop iterations.
+			\item pending table: A table of reads and writes of the current loop iteration
+			\item killed bits: A set of instructions which were written before read in the current loop instance. 
+		\end{itemize}
+		
+		\subsection{Simple demonstration}
 		
 		Here is the cumulative sum procedure, written in terms of reads and writes
 		
@@ -427,30 +473,56 @@ for(int i = 1; i < n; i++){
 }
 		\end{lstlisting}
 		
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{History Table} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			cell4 & cell5 & cell6 \\ 
-			cell7 & cell8 & cell9 \\ 
-			\hline
-		\end{tabular}
+		Here is the state of the history and pending tables at the end of the 3rd loop iteration. 
+		
 		\begin{tabular}{ |c|c|c| } 
 			\hline
 			\multicolumn{3}{|c|}{Pending Table} \\
 			\hline
 			Instr & Memory & R/W \\ 
 			\hline
-			cell4 & cell5 & cell6 \\ 
-			cell7 & cell8 & cell9 \\ 
+			2 & B[2] & R \\ 
+			3 & A[3] & R \\ 
+			4 & B[3] & W \\ 
 			\hline
 		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			2 & B[0] & R \\ 
+			3 & A[1] & R \\ 
+			4 & B[1] & W \\ 
+			2 & B[1] & R \\ 
+			3 & A[2] & R \\ 
+			4 & B[2] & W \\ 
+			\hline
+		\end{tabular}
+				
+		\subsection{Nested loop demonstration}
+		
+		Now, this method also needs to work for nested loops.  
+		
+		In this vector-matrix multiplication procedure, the inner loop is not parallel, but the outer loop is. We need to be able to detect this.
+		
+		
+		\begin{lstlisting}
+for(int i = 0; i < size; i++){
+	y[i] = 0
+	for(int j = 0; j < size; j++){
+		y[i] += M[i][j] * x[j]
+	}
+}
+		\end{lstlisting}
+		
+		When \texttt{i = 2} and \texttt{j = 2}, the resulting table looks like:
 		
 		
 	
 	\section{Motivation}
+	
 		Recall that one of the most important things to establish about the program is whether it can in theory run in parallel. This is a very important factor in determining a program's hardware matchup.
 
 		One problem is that there are no good open source tools for determining theoretical parallelism in real code. So we will have to create one ourselves. We will constrain ourselves to loop parallelism, as detecting general parallelism is impossible. 
