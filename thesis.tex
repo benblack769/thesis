@@ -376,11 +376,54 @@
 		We came to the conclusion that current open source parallelism detection tools do not meet our efficiency and accuracy requirements, and so we built our own tool which does meet our needs. 
 		
 	\section{Prior methods}
+	\section{Loop level parallelism}
+	
+		Parallelism is a general topic that can apply to all sorts of code in all sorts of ways. We will only be discussing a very specific kind of parallelism: loop level parrelelism. This type of parrelelism is common, easy to detect, scales well on massively parrelel hardware, and simple for programmers to reason about. 
+		
+		But before we get into the details of why we care so much about loop level parrelelism, lets go into some detail about what it is.
+		
+		\subsection{What is Loop level parrelelism?}
+		
+		In a vauge sense, Loop level parrelelism occurs when each iteration of the loop can be run in parrellel with all the other iterations. 
+		
+		Here is a vector-scalar multiply procedure. 
+		
+		\begin{lstlisting}
+for(int i = 0; i < n; i++){
+	B[i] = B[i] * 2;
+}
+		\end{lstlisting}
+		
+		The above procedure is loop parallel, because every iteration is independent from every other iteration. In other words, you can compute this loop given any ordering of \texttt{i}.
+		
+		Here is a cumulative sum algorithm. 
+		
+		\begin{lstlisting}
+for(int i = 1; i < n; i++){
+	B[i] = B[i-1] + A[i];
+}
+		\end{lstlisting}
+		
+		This procedure is not loop-parallel. It needs to compute \texttt{B[i-1]} before it can calculate \texttt{B[i]}. 
+		
+		\subsection{Desirable qualities of loop level parelleism}
+		
+		Loop level parrelelism is common, easy to detect, scales well on massively parrelel hardware, and simple for programmers to reason about. 
+		
+		The most important thing about loop level parrelelism is that assuming the loop is reasonably large, it can be scaled to massively parrelell hardware like GPUs or other kinds of accelerators. 
+		
+		Lastly, loop level parrellelism is easy to detect. The next section will give a simple algorithm to detect this. Other kinds of massive parrelleism require more sophisticated analysis. 
+		
+		\subsection{Dynamic Loops}
+		
+		Loops have a very clean and simple structure in high languages like C. However, we are interested in dynamic analysis of loops, which means we will have to detect and analyze loops in machine code. 
+		
+		
 	\section{Loop level parallelism and the base algorithm}
 	
-		We will be entirely focused on  detecting a single type of parallelism: loop level parallelism. This type of parrleleism is easy to detect, and common in real code. 
+		We will be entirely focused on  detecting a single type of parallelism: loop level parallelism. This type of parallelism is easy to detect, and common in real code. 
 		
-		\subsection{Formalizing parrelelism}
+		\subsection{Formalizing parallelism}
 			
 			In order to create an algorithm that detects loop parallelism, we will have to formalize the notion of loops being independent.
 			
@@ -388,29 +431,6 @@
 			
 		\subsection{What is loop level parrelelism}
 		
-			Loop level parrelelism occurs when each iteration of the loop can be run in parrellel with all the other iterations. 
-		
-			Here is a vector-scalar multiply procedure. 
-			
-			\begin{lstlisting}
-for(int i = 0; i < n; i++){
-	B[i] = B[i] * 2;
-}
-			\end{lstlisting}
-			
-			The above procedure is loop parallel, because every iteration is independent from every other iteration. In other words, you can compute this loop given any ordering of \texttt{i}.
-			
-			
-			Here is a cumulative sum algorithm. 
-			
-			\begin{lstlisting}
-for(int i = 1; i < n; i++){
-	B[i] = B[i-1] + A[i];
-}
-			\end{lstlisting}
-			
-			This procedure is not loop-parallel. It needs to compute \texttt{B[i-1]} before it can calculate \texttt{B[i]}. 
-			
 		\subsection{The pairwise method}
 			
 			The baseline algorithm we use for detecting loop level parrelelism is called the pairwise method. It 
