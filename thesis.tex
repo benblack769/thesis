@@ -194,7 +194,7 @@
 
 		%Right now, people face the tradeoff between performance and productivity as a fact of life. Except for GPUs, which have mature high level languages, adopting a new hardware platform usually means
 
-		%The reality is that the vast majority of software does not see heterogenous computing as a viable option. Of course, machines are fast enough that we don't have to worry about most software, only ones that consume lots of resources.
+		%The reality is that the vast majority of software does not see heterogeneous computing as a viable option. Of course, machines are fast enough that we don't have to worry about most software, only ones that consume lots of resources.
 
 		%So what kinds of software are we looking to help?
 
@@ -248,9 +248,9 @@
 			You are developing code for a system, you profile the code and you find a performance critical section.
 			\item You use our tool to understand if this section of code can be parallelized, and what kind of parallelization it can handle (vector, thread, or both).
 
-			\item If the tool tells you it can be parrelelized, and what kind, this will allow you to confidently spend time on this code knowing that it will be worth it.
+			\item If the tool tells you it can be parallelized, and what kind, this will allow you to confidently spend time on this code knowing that it will be worth it.
 
-			If the tool tells you it can't be parrelleized, then it should give you some indication about why it can't be, and where in the code the problem is arising.
+			If the tool tells you it can't be parallelized, then it should give you some indication about why it can't be, and where in the code the problem is arising.
 
 			This should allow the programmer to determine if there is some workaround for the problem.
 
@@ -259,7 +259,7 @@
 			\begin{enumerate}
 				\item Problem: Critical data dependency:
 
-				Possible solution: Perhaps there is an algebraic or algorithmic trick that allows you to parrelleize it.
+				Possible solution: Perhaps there is an algebraic or algorithmic trick that allows you to parallelize it.
 
 				\item Problem: side data dependency (dependency occurs in a logger, assert, or some other non-critical code)
 
@@ -278,7 +278,7 @@
 
 		And the Intel advisor code involved is very proprietary, and the tools are very expensive (starts at \$1600), and it is not built to be useful for non-Intel processors, or even Intel Integrated Graphics, so it will not be very helpful to achive our goals.
 
-		So we need some sort of analysis seperate from Intel Advisor, but which allows for a similar workflow.
+		So we need some sort of analysis separate from Intel Advisor, but which allows for a similar workflow.
 
 	\section{Parts of thesis}
 
@@ -302,7 +302,7 @@
 
 		People have suggested using it for determine where to make speculative automatic parallelization. \footnote{\cite{Chen:2004}} There idea here is that the compiler may not be able to prove that the code is parallel, but it may be able to generate code where if there is not a data conflict, or not many, then there is minimal performance loss. Of course, if there are many dependencies, there may be significant performance loss, so the profiler needs to establish a high degree of parallelism on real inputs.
 
-		It is also useful in a tool which tell the software developer what is parallelizeable and what is not.[CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!]
+		It is also useful in a tool which tell the software developer what is parallelizable and what is not.[CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!]
 		In larger, complex software, often dependencies are not clearly defined, and manually determining dependencies by sifting through code may be impractical. But dynamic dependency analysis will tell the developer for sure if a block of code can be safely parallelized on the inputs given (it guarantees nothing about other inputs, but this test may be good enough for many developers).
 
 		Then, of course, it is critical for our goal. The common theme among new architectures is trading off single threaded performance for power efficiency or high degrees of parallelism [CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!].
@@ -375,16 +375,17 @@
 		 
 		We came to the conclusion that current open source parallelism detection tools do not meet our efficiency and accuracy requirements, and so we built our own tool which does meet our needs. 
 		
-	\section{Prior methods}
+		This chapter goes over the necessary background for that tool. In section 2, we introduce the type of parallelism we are detecting, and why it is so important. In section 3, we introduce the base algorithm for detecting it, and the problems with it. In section 4, we go over prior work in this area, and how it doesn't suit our needs completely. 
+		
 	\section{Loop level parallelism}
 	
-		Parallelism is a general topic that can apply to all sorts of code in all sorts of ways. We will only be discussing a very specific kind of parallelism: loop level parrelelism. This type of parrelelism is common, easy to detect, scales well on massively parrelel hardware, and simple for programmers to reason about. 
+		Parallelism is a general topic that can apply to all sorts of code in all sorts of ways. We will only be discussing a very specific kind of parallelism: loop level parallelism (LLP). This type of parallelism is common, easy to detect, scales well on massively parallel hardware, and simple for programmers to reason about. 
 		
-		But before we get into the details of why we care so much about loop level parrelelism, lets go into some detail about what it is.
+		But before we get into the details of why we care so much about loop level parallelism, lets go into some detail about what it is.
 		
-		\subsection{What is Loop level parrelelism?}
+		\subsection{What is Loop level parallelism?}
 		
-		In a vauge sense, Loop level parrelelism occurs when each iteration of the loop can be run in parrellel with all the other iterations. 
+		In a vague sense, LLP occurs when each iteration of the loop can be run in parallel with all the other iterations. 
 		
 		Here is a vector-scalar multiply procedure. 
 		
@@ -394,7 +395,7 @@ for(int i = 0; i < n; i++){
 }
 		\end{lstlisting}
 		
-		The above procedure is loop parallel, because every iteration is independent from every other iteration. In other words, you can compute this loop given any ordering of \texttt{i}.
+		The above loop is parallel because every iteration is independent from every other iteration. In other words, you can compute this loop given any ordering of \texttt{i}.
 		
 		Here is a cumulative sum algorithm. 
 		
@@ -406,18 +407,23 @@ for(int i = 1; i < n; i++){
 		
 		This procedure is not loop-parallel. It needs to compute \texttt{B[i-1]} before it can calculate \texttt{B[i]}. 
 		
-		\subsection{Desirable qualities of loop level parelleism}
+		\subsection{Desirable qualities of loop level parallelism}
 		
-		Loop level parrelelism is common, easy to detect, scales well on massively parrelel hardware, and simple for programmers to reason about. 
+		We like LLP for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
 		
-		The most important thing about loop level parrelelism is that assuming the loop is reasonably large, it can be scaled to massively parrelell hardware like GPUs or other kinds of accelerators. 
+		Of course, loops are very common in all low level code. A large number of these loops are massively parallel CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
-		Lastly, loop level parrellelism is easy to detect. The next section will give a simple algorithm to detect this. Other kinds of massive parrelleism require more sophisticated analysis. 
+		Loop level parallelism is part of a class of parallelism called massive parallelism That means that if the loop is reasonably large, it can be scaled to massively parallel hardware like GPUs or other kinds of accelerators. 
 		
-		\subsection{Dynamic Loops}
+		Parallelizing loops is also very simple for the programmer to reason about. With OpenMP, one can parallelize loops on CPUs with a one line directive. In lower level accelerator code, like OpenCL, it is still relatively easy to translate loops into parallel kernels, just by porting the inner part of the code to an kernel, and run it on all the iterations of the loop in parallel 
 		
-		Loops have a very clean and simple structure in high languages like C. However, we are interested in dynamic analysis of loops, which means we will have to detect and analyze loops in machine code. 
+		Lastly, loop level parallelism is easy to detect. The next section will give a simple algorithm to detect this. Other kinds of massive parallelism require more sophisticated analysis. 
 		
+		\subsection{Dynamic Loop Detection}
+		
+		Loops have a clean structure in high languages like C. However, as we are interested in doing dynamic profiling that will require us to understand the structure of loops in machine code. And loops in machine code are simply difficult to work with.
+		
+		Luckily, there is prior work for doing just this. We use LoopProf \footnote{\cite{Chen:2004}} code in order to detect locations of loops in code. The LoopProf implementation did not contain all of the functionality we needed. In particular, it did not detect precise ends of loops, which we needed for dynamic dependence analysis. So we made some alterations in order to deal with this problem. Unfortunately, these are technical enough and far enough away from the point of this chapter, that we will not get into more detail about this. 
 		
 	\section{Loop level parallelism and the base algorithm}
 	
@@ -429,11 +435,11 @@ for(int i = 1; i < n; i++){
 			
 			The formal notion is simple. Two procedures can run in parallel if neither uses input which is produced as output from the other.
 			
-		\subsection{What is loop level parrelelism}
+		\subsection{What is loop level parallelism}
 		
 		\subsection{The pairwise method}
 			
-			The baseline algorithm we use for detecting loop level parrelelism is called the pairwise method. It 
+			The baseline algorithm we use for detecting loop level parallelism is called the pairwise method. It 
 			
 	\section{Performance and memory issues with the pairwise method}
 	\section{Implementation of Stride and bitwise method}
@@ -595,7 +601,7 @@ for(int i = 0; i < size; i++){
 		(D) [->] edge [bend right] node [left] {} (E);
 		\end{tikzpicture}
 
-		Hopefully you can see that this is an intuitive framework to examine parrelelizability. In the example above, nodes $D$ and $E$ can be run in parallel since neither depend on the other. $F$ can also be run in parallel with $E$, but not with $D$, since it depends on $D$ already being calculated. $G$ can only be run after all other steps are finished, as it recursively depends on $D,E$, and $F$.
+		Hopefully you can see that this is an intuitive framework to examine parallelizability In the example above, nodes $D$ and $E$ can be run in parallel since neither depend on the other. $F$ can also be run in parallel with $E$, but not with $D$, since it depends on $D$ already being calculated. $G$ can only be run after all other steps are finished, as it recursively depends on $D,E$, and $F$.
 
 		The degree to which this graph is parallelizable corresponds to the depth of the graph. By depth, we simply mean the maximal length of any path from an input to an output. This can be easily calculated using topological sort. This maximal length is guaranteed to be finite for any directed acyclic graph. In the example above, the depth is 3, as $A\rightarrow D \rightarrow F \rightarrow G$ has 3 edges, and no path has more than 3.
 
@@ -603,7 +609,7 @@ for(int i = 0; i < size; i++){
 
 		One extremely simple example of a massively parallel algorithm is a vector addition. If you want to sum two vectors $a$ and $b$, by computing $c = a+b$, then the obvious algorithm is to take each $i$, and compute $c_i = a_i + b_i$. Since each of these operations is completely dependent on the others, this is a constant depth dependency graph.
 
-		One important example of a massively parallel algorithm is summing. When you have an array $A_1,A_2,...,A_n$ of numbers and you sum them, there are different ways to do it, some of which are parrelelizable, some of which are not. The most obvious sequential algorithm, computing $(A_1+(A_2+(A_3+...+A_n)))$ has a dependency graph of depth $n$. However, addition is associative, so we can rearrange the parenthesis like this: $(((A_1+A_2)+(A_3+A_4))+...(A_{n-1}+A_n))$ to give us a log depth dependency graph. Below are two algorithms that describe these methods.
+		One important example of a massively parallel algorithm is summing. When you have an array $A_1,A_2,...,A_n$ of numbers and you sum them, there are different ways to do it, some of which are parallelizable, some of which are not. The most obvious sequential algorithm, computing $(A_1+(A_2+(A_3+...+A_n)))$ has a dependency graph of depth $n$. However, addition is associative, so we can rearrange the parenthesis like this: $(((A_1+A_2)+(A_3+A_4))+...(A_{n-1}+A_n))$ to give us a log depth dependency graph. Below are two algorithms that describe these methods.
 
 		\begin{algorithm}
 			\caption{MassiveParrelelSum}\label{parellelsum}
@@ -626,11 +632,11 @@ for(int i = 0; i < size; i++){
 			\end{algorithmic}
 		\end{algorithm}
 
-		Now, this is bad since we have two algorithms to compute the same problem, but one of which is parrelizable, and one of which is not. And what allows us to do the transformation from one to the other depends on an algebraic quality that is true for many operations and procedures other than addition. For example subtraction is not associative, but repeated subtraction can have a similar transformation because you can take $\text{RepeatedSubtraction}(A) = -\text{Sum}(A)$, and then do the same log depth calculation with only one more step at the end.
+		Now, this is bad since we have two algorithms to compute the same problem, but one of which is parallelizable, and one of which is not. And what allows us to do the transformation from one to the other depends on an algebraic quality that is true for many operations and procedures other than addition. For example subtraction is not associative, but repeated subtraction can have a similar transformation because you can take $\text{RepeatedSubtraction}(A) = -\text{Sum}(A)$, and then do the same log depth calculation with only one more step at the end.
 
 		This general method of using divide and conquer to turn a linear depth operation into a log depth one is called a reduction, and is the basis of the MapReduce cluster computing paradigm.
 
-		Since these are important targets of parallelization, we will try our best to identify these cases, but it is most likely impossible to assess the possibility of this transformation automatically with perfect accuracy, so we will have to analyise actual cases.
+		Since these are important targets of parallelization, we will try our best to identify these cases, but it is most likely impossible to assess the possibility of this transformation automatically with perfect accuracy, so we will have to analyses actual cases.
 
 		\subsection{Reporting}
 
@@ -664,7 +670,7 @@ for(int i = 0; i < size; i++){
 
 		Loop level parallelism is when one iteration of a loop is independent from the rest. This kind of parallelism is the main target of massively parallel architectures. Other types of parallelism, including parallel recursive calls and task parallelism are generally less important or less parallelizable than loop level parallelism.
 
-		The idea is to figure out if an iteration of a loop is independent from each other loop iteration. If this is the case, then it clearly is highly parrelelizable.
+		The idea is to figure out if an iteration of a loop is independent from each other loop iteration. If this is the case, then it clearly is highly parallelizable
 
 		The real reason why this is an important case is because it is very easy to measure, requiring very little memory and computation. Take the following loop:
 \begin{lstlisting}
@@ -751,7 +757,7 @@ for(int i = n; i < 3n; i++){
 		Unfortunately, memory locations are no the only source of possible memory dependencies. There are also registers.
 
 
-		One case of a unparrelelizable register/flag dependency is multiprecision addition.
+		One case of a unparallelizable register/flag dependency is multiprecision addition.
 
 		Say you have 2 numbers of arbitrary size, $A0$, and $B$. $A_i$ is the $i$th 64 bit block of $A$. Then you have the following algorithm to compute addition:
 
@@ -769,7 +775,7 @@ for(int i = 0; i < min_size(A,B); i++){
 ...
 		\end{lstlisting}
 
-		The first thing to note is that in the worst case, you cannot write to any element of $R_i$ before reading every element of $A$ and $B$ before $i$. So it is not parrelelizable in this case. In practice, it will be somewhat parrelelizable, since that case can safely be assumed to be rare. But a memory-only pairwise method will see that this loop is trivially parrelelizable. On the other hand, looking at the registers, there is a clear read-after-write conflict.
+		The first thing to note is that in the worst case, you cannot write to any element of $R_i$ before reading every element of $A$ and $B$ before $i$. So it is not parallelizable in this case. In practice, it will be somewhat parallelizable, since that case can safely be assumed to be rare. But a memory-only pairwise method will see that this loop is trivially parallelizable On the other hand, looking at the registers, there is a clear read-after-write conflict.
 
 		Some papers ignore this case, as register dependencies can be analyzed statically.\footnote{\cite{Chen:2004}} However, for our uses, we need to know about register dependencies, and so we need to do this either statically or dynamically.
 
