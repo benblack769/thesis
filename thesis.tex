@@ -411,7 +411,7 @@ for(int i = 1; i < n; i++){
 		
 		We like LLP for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
 		
-		Of course, loops are very common in all low level code. A large number of these loops are massively parallel CITATION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		Of course, loops are very common in all low level code. A large number of these loops are loop parallel. 
 		
 		Loop level parallelism is part of a class of parallelism called massive parallelism That means that if the loop is reasonably large, it can be scaled to massively parallel hardware like GPUs or other kinds of accelerators. 
 		
@@ -421,71 +421,33 @@ for(int i = 1; i < n; i++){
 		
 		\subsection{Dynamic Loop Detection}
 		
-		Loops have a clean structure in high languages like C. However, as we are interested in doing dynamic profiling that will require us to understand the structure of loops in machine code. And loops in machine code are simply difficult to work with.
+		Loops have a clean structure in high languages like C. However, as we are interested in doing dynamic profiling that will require us to understand the structure of loops in machine code. And loops in machine code are simply difficult to work with, as they are implemented with "go to" instructions which happen to go back to where you came from, rather than somewhere else. So in order to understand loops in machine code, we have to somehow separate loops out from a tangle of "go to" instructions. 
 		
-		Luckily, there is prior work for doing just this. We use LoopProf \footnote{\cite{Chen:2004}} code in order to detect locations of loops in code. The LoopProf implementation did not contain all of the functionality we needed. In particular, it did not detect precise ends of loops, which we needed for dynamic dependence analysis. So we made some alterations in order to deal with this problem. Unfortunately, these are technical enough and far enough away from the point of this chapter, that we will not get into more detail about this. 
+		Luckily, there is prior work for doing just this. We use LoopProf \footnote{\cite{Chen:2004}} code in order to detect locations of loops in code. In particular, LoopProf tells us where the loop begins, and the nesting structure of the loops. However, the LoopProf implementation did not contain all of the functionality we needed. In particular, it did not detect precise ends of loops, which we needed for dynamic dependence analysis. So we made some alterations in order to deal with this problem. Unfortunately, these are technical enough and far enough away from the point of this chapter, that we will not get into more detail about this. 
 		
-	\section{Loop level parallelism and the base algorithm}
+	\section{The baseline algorithm: The pairwise method}
 	
-		We will be entirely focused on  detecting a single type of parallelism: loop level parallelism. This type of parallelism is easy to detect, and common in real code. 
+		Our goal is to build an efficient algorithm for determining parallelism of loops and tracking where dependencies are in code. We will introduce a simple method which can gather then necessary information, and then optimize it using compression. This simple method is called the pairwise method. 
 		
-		\subsection{Formalizing parallelism}
-			
-			In order to create an algorithm that detects loop parallelism, we will have to formalize the notion of loops being independent.
-			
-			The formal notion is simple. Two procedures can run in parallel if neither uses input which is produced as output from the other.
-			
-		\subsection{What is loop level parallelism}
-		
-		\subsection{The pairwise method}
-			
-			The baseline algorithm we use for detecting loop level parallelism is called the pairwise method. It 
-			
-	\section{Performance and memory issues with the pairwise method}
-	\section{Implementation of Stride and bitwise method}
-	\section{Memory and performance problems}
-	
-		
-			
-		
-
-	\section{Need for a new dynamic parallelism detection tool}
-	
-		\begin{itemize}
-			\item Reminder: need to detect parallelism to determine hardware compatibility
-			\item Static parallel detection is not good enough
-			\item No sufficiently good open source dynamic parallelism tool
-		\end{itemize}
-	
+		Before diving into details, we'll give a broad overview of the concepts behind the pairwise method. All of this will be explained in more detail later. 
 		
 		
-		%Now, there a massively parallel algorithm that does compute the same answer. However, we will not concern ourselves with this because it is impossible to detect this in general. The algorithm choice will still need to be made by hand. Rather, we want to be able to detect whether the particular algorithm is 
+		Recall that loop parallelism occurs when each iteration of loop can be executed independently from every other iteration, and that independence means that one iteration doesn't depend on data computed by another iteration. 
+		The pairwise method tracks dependencies as reads and writes to memory. Each read is considered to be an input to the computation in the loop, and each write is an output. So if one loop iteration reads from one bit of memory and a later one writes to that same byte of memory, then that is a dependence that should be recorded. 
 		
-	\section{Terminology}
+		Now, there is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if memory is written to before it is read in a loop iteration, then it is "cleared", and further reads in that iteration will not be tracked for dependencies. 
 		
-		\begin{itemize}
-			\item Loop iteration: ???
-			\item 
-			\item Loop instance
-		\end{itemize}
-	
-	\section{Dependency graphs}
-	
+		So we will store 3 things:
 		
-	\section{Pairwise method}
-		 
-		Building and analyzing full dependency graphs is completely impractical for longer running programs. The reason is that you need to store every input location of every instruction, so the memory consumption increases linearly with running time (with bad constants). 
-		
-		So instead of tracing exact dependencies, we will look at inputs of the entire loop iteration, and see if they were produced by any output in all previous iterations of the loop instance. 
-		
-		In order to do this formally, we will need to introduce 3 concepts:
-		
-		Each loop has the following
 		\begin{itemize}
 			\item history table: A table of reads and writes of previous loop iterations.
 			\item pending table: A table of reads and writes of the current loop iteration
 			\item killed bits: A set of instructions which were written before read in the current loop instance. 
 		\end{itemize}
+	
+		All of this becomes more clear with examples.
+		
+		
 		
 		\subsection{Simple demonstration}
 		
@@ -526,7 +488,9 @@ for(int i = 1; i < n; i++){
 			4 & B[2] & W \\ 
 			\hline
 		\end{tabular}
-				
+		
+		
+		
 		\subsection{Nested loop demonstration}
 		
 		Now, this method also needs to work for nested loops.  
@@ -535,9 +499,9 @@ for(int i = 1; i < n; i++){
 		
 		
 		\begin{lstlisting}
-for(int i = 0; i < size; i++){
+for(int i = 0; i < output_size; i++){
 	y[i] = 0
-	for(int j = 0; j < size; j++){
+	for(int j = 0; j < input_size; j++){
 		y[i] += M[i][j] * x[j]
 	}
 }
@@ -546,7 +510,10 @@ for(int i = 0; i < size; i++){
 		When \texttt{i = 2} and \texttt{j = 2}, the resulting table looks like:
 		
 		
-	
+		
+		\subsection{Registers/Stack}
+			
+			
 	\section{Motivation}
 	
 		Recall that one of the most important things to establish about the program is whether it can in theory run in parallel. This is a very important factor in determining a program's hardware matchup.
