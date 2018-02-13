@@ -379,25 +379,29 @@
 		
 	\section{Loop level parallelism}
 	
-		Parallelism is a general topic that can apply to all sorts of code in all sorts of ways. We will only be discussing a very specific kind of parallelism: loop level parallelism (LLP). This type of parallelism is common, easy to detect, scales well on massively parallel hardware, and simple for programmers to reason about. 
+		Parallelism exists in different code structures, and at different levels of granularity. Programmers talk about how parallelism manifests itself in code. These include task parallelism (executing different functions in parallel), and  loop parallelism (running different parts of a loop in parallel). Computer architects talk about different ways parallelism manifests in hardware, including instruction level parallelism, thread level parallelism, and memory level parallelism. 
 		
-		But before we get into the details of why we care so much about loop level parallelism, lets go into some detail about what it is.
+		This thesis focuses on loop level parallelism (LLP). This type of parallelism is common, easy to detect, scalable on massively parallel processors, and simple for programmers to reason about. 
 		
 		\subsection{What is Loop level parallelism?}
 		
-		In a vague sense, LLP occurs when each iteration of the loop can be run in parallel with all the other iterations. 
+		Loop level parallelism occurs when every iteration of the loop can be run independently from every other iteration. 
 		
-		Here is a vector-scalar multiply procedure. 
+		First, an overview of terminology. A loop is when the same code executes over and over on different data. An loop iteration is a single execution of the code in the loop. Two loop iterations are independent if the later iteration does not use data computed by the prior iteration. 
+		
+		\subsection{Examples of Loop level parallelism}
+		
+		Here is code that performs a vector-scalar multiply operation. 
 		
 		\begin{lstlisting}
 for(int i = 0; i < n; i++){
-	B[i] = B[i] * 2;
+	B[i] = B[i] * c;
 }
 		\end{lstlisting}
 		
-		The above loop is parallel because every iteration is independent from every other iteration. In other words, you can compute this loop given any ordering of \texttt{i}.
+		This loop is parallelizable. In this loop, an iteration is simply the calculation of \texttt{B[i] = B[i] * c} for some \texttt{0 <= i < n}. Clearly any of these iterations can be executed before any other one. So you can compute them in any order, without affecting correctness, so it is parallelizable. 
 		
-		Here is a cumulative sum algorithm. 
+		To contrast, here is code that performs a cumulative sum. 
 		
 		\begin{lstlisting}
 for(int i = 1; i < n; i++){
@@ -405,11 +409,13 @@ for(int i = 1; i < n; i++){
 }
 		\end{lstlisting}
 		
-		This procedure is not loop-parallel. It needs to compute \texttt{B[i-1]} before it can calculate \texttt{B[i]}. 
+		This loop is not parallelizable. A given iteration \texttt{B[i] = B[i-1] + A[i];} for \texttt{i > 1} cannot be computed correctly until \texttt{B[i-1]} is calculated. So the loop must be executed in a particular order, so it is not parallelizable. 
 		
 		\subsection{Desirable qualities of loop level parallelism}
 		
-		We like LLP for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
+		A huge amount of work in research and tooling has been devoted to loop level parallelism. 
+		
+		LLP for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
 		
 		Of course, loops are very common in all low level code. A large number of these loops are loop parallel. 
 		
@@ -421,23 +427,43 @@ for(int i = 1; i < n; i++){
 		
 		\subsection{Dynamic Loop Detection}
 		
-		Loops have a clean structure in high languages like C. However, as we are interested in doing dynamic profiling that will require us to understand the structure of loops in machine code. And loops in machine code are simply difficult to work with, as they are implemented with "go to" instructions which happen to go back to where you came from, rather than somewhere else. So in order to understand loops in machine code, we have to somehow separate loops out from a tangle of "go to" instructions. 
+		Simply determining where loops start and end is a challenging problem. 
+		Loops have a clean structure in high languages like C. It is easy for both the machine and a human to understand what code is inside them, and when they start and end. However, this paper focused on dynamic analysis of loops. And doing dynamic analysis requires us to understand the structure of loops in machine code, as there is not always a precise mapping from machine code to source code. And loops in machine code are simply difficult to work with, as they are implemented with "go to" instructions which happen to go back to where you came from, rather than somewhere else. 
 		
-		Luckily, there is prior work for doing just this. We use LoopProf \footnote{\cite{Chen:2004}} code in order to detect locations of loops in code. In particular, LoopProf tells us where the loop begins, and the nesting structure of the loops. However, the LoopProf implementation did not contain all of the functionality we needed. In particular, it did not detect precise ends of loops, which we needed for dynamic dependence analysis. So we made some alterations in order to deal with this problem. Unfortunately, these are technical enough and far enough away from the point of this chapter, that we will not get into more detail about this. 
+		To demonstrate how this makes analysis difficult, here is the standard way of translating the above vector-scalar multiply loop into machine code. 
+		
+		\begin{lstlisting}
+i = 1
+i += 1
+if i >= n goto line 8
+tmp1 = B[i-1]
+tmp1 *= c
+B[i] = c
+goto line 2
+...
+		\end{lstlisting}
+		
+		Note that the loop starts on line 2, which is a bit tricky to see. 
+		
+		Note that even with a single simple loop, there two gotos. With nested loops, branches, and break statements, it quickly becomes very difficult to understand where the loop starts, and how to know that the loop terminated.
+		So in order to understand loops in machine code, we have to somehow separate loops out from a tangle of "go to" instructions. 
+		
+		Luckily, there is prior work for doing just this. We use LoopProf \footnote{\cite{Chen:2004}} code in order to detect locations of loops in code. In particular, LoopProf tells us where the loop begins, and the nesting structure of the loops. 
+		
+		LoopProf also uses dynamic analysis in order to determine where the loops are. At a high level, it tracks a list of instructions executed in a function. When that list folds back on itself, LoopProf concludes that there was a loop, and the second iteration just started. 
+		
+		However, the LoopProf implementation did not contain all of the functionality we needed. In particular, it did not detect precise ends of loops, which we needed for dynamic dependence analysis. So we made some alterations in order to deal with this problem. Unfortunately, these are technical enough and far enough away from the point of this chapter, that we will not get into more detail about this. 
 		
 	\section{The baseline algorithm: The pairwise method}
 	
-		Our goal is to build an efficient algorithm for determining parallelism of loops and tracking where dependencies are in code. We will introduce a simple method which can gather then necessary information, and then optimize it using compression. This simple method is called the pairwise method. 
-		
-		Before diving into details, we'll give a broad overview of the concepts behind the pairwise method. All of this will be explained in more detail later. 
-		
+		This paper's goal is to design and implement an efficient algorithm for determining parallelism of loops and tracking where dependencies are in code. This section introduces a simple method which can gather the necessary information to do this dependency tracking. 
 		
 		Recall that loop parallelism occurs when each iteration of loop can be executed independently from every other iteration, and that independence means that one iteration doesn't depend on data computed by another iteration. 
 		The pairwise method tracks dependencies as reads and writes to memory. Each read is considered to be an input to the computation in the loop, and each write is an output. So if one loop iteration reads from one bit of memory and a later one writes to that same byte of memory, then that is a dependence that should be recorded. 
 		
-		Now, there is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if memory is written to before it is read in a loop iteration, then it is "cleared", and further reads in that iteration will not be tracked for dependencies. 
+		Now, there is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if memory is written to before it is read in a loop iteration, then it is "killed", and further reads in that iteration will not be tracked for dependencies. 
 		
-		So we will store 3 things:
+		So the pairwise method stores 3 different structures for a particular loop. 
 		
 		\begin{itemize}
 			\item history table: A table of reads and writes of previous loop iterations.
