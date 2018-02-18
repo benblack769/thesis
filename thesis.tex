@@ -317,7 +317,6 @@
 
 	\subsubsection{Things we should consider from software side}
 
-
 	\begin{itemize}
 		\item Parallelism  (whole section on that)
 			\begin{itemize}
@@ -413,11 +412,11 @@ for(int i = 1; i < n; i++){
 		
 		\subsection{Desirable qualities of loop level parallelism}
 		
-		A huge amount of work in research and tooling has been devoted to loop level parallelism. 
+		A huge amount of work in research and tool development has been devoted to exploiting loop level parallelism. Many automatic parallelizers and parallelism frameworks are focused on loop level parallelism. OpenMP is a C and C++ parallelism framework that allows programmers to parallelize loops with a single line of code. Attempts at automatic parallelization have been primarily focused on loops. 
 		
-		LLP for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
+		Loop level parallelism is important for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
 		
-		Of course, loops are very common in all low level code. A large number of these loops are loop parallel. 
+		Of course, loops are very common in code. As prior work on loop parallelism has shown, a large number of these loops are parallel. 
 		
 		Loop level parallelism is part of a class of parallelism called massive parallelism That means that if the loop is reasonably large, it can be scaled to massively parallel hardware like GPUs or other kinds of accelerators. 
 		
@@ -428,7 +427,7 @@ for(int i = 1; i < n; i++){
 		\subsection{Dynamic Loop Detection}
 		
 		Simply determining where loops start and end is a challenging problem. 
-		Loops have a clean structure in high languages like C. It is easy for both the machine and a human to understand what code is inside them, and when they start and end. However, this paper focused on dynamic analysis of loops. And doing dynamic analysis requires us to understand the structure of loops in machine code, as there is not always a precise mapping from machine code to source code. And loops in machine code are simply difficult to work with, as they are implemented with "go to" instructions which happen to go back to where you came from, rather than somewhere else. 
+		Loops have a clean structure in high languages like C. It is easy for both the machine and a human to understand what code is inside them, and when they start and end. However, this paper focused on dynamic analysis of loops. And doing dynamic analysis requires us to understand the structure of loops in machine code, as there is not always a precise mapping from machine code to source code. And loops in machine code are simply difficult to work with, as they are implemented with "go to" instructions.
 		
 		To demonstrate how this makes analysis difficult, here is the standard way of translating the above vector-scalar multiply loop into machine code. 
 		
@@ -456,12 +455,14 @@ goto line 2
 		
 	\section{The baseline algorithm: The pairwise method}
 	
+		One of the goals of this thesis is to build a tool that tracks dependencies in loops. 
+		
 		This paper's goal is to design and implement an efficient algorithm for determining parallelism of loops and tracking where dependencies are in code. This section introduces a simple method which can gather the necessary information to do this dependency tracking. 
 		
 		Recall that loop parallelism occurs when each iteration of loop can be executed independently from every other iteration, and that independence means that one iteration doesn't depend on data computed by another iteration. 
 		The pairwise method tracks dependencies as reads and writes to memory. Each read is considered to be an input to the computation in the loop, and each write is an output. So if one loop iteration reads from one bit of memory and a later one writes to that same byte of memory, then that is a dependence that should be recorded. 
 		
-		Now, there is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if memory is written to before it is read in a loop iteration, then it is "killed", and further reads in that iteration will not be tracked for dependencies. 
+		There is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if memory is written to before it is read in a loop iteration, then it is "killed", and further reads in that iteration will not be tracked for dependencies. 
 		
 		So the pairwise method stores 3 different structures for a particular loop. 
 		
@@ -486,6 +487,23 @@ for(int i = 1; i < n; i++){
 	WRITE B[i]
 }
 		\end{lstlisting}
+		
+		So when the loop is executed, it creates a stream of information which is fed into the pairwise method algorithm. 
+		\begin{lstlisting}
+LOOP START
+LINE 2 READ B[0]
+LINE 3 READ  A[1]
+LINE 4 WRITE B[1]
+LOOP ITERATION
+LINE 2 READ B[1]
+LINE 3 READ  A[2]
+LINE 4 WRITE B[2]
+LOOP ITERATION
+...
+LOOP END
+		\end{lstlisting}
+		
+		This information is read and processed in the tables. 
 		
 		Here is the state of the history and pending tables at the end of the 3rd loop iteration. 
 		
@@ -515,14 +533,13 @@ for(int i = 1; i < n; i++){
 			\hline
 		\end{tabular}
 		
-		
+		Here, there is a conflict at memory address at B[2] between instr 4 in the history table and instr 2 in the pending table. So this will be logged as a loop dependency. 
 		
 		\subsection{Nested loop demonstration}
 		
 		Now, this method also needs to work for nested loops.  
 		
 		In this vector-matrix multiplication procedure, the inner loop is not parallel, but the outer loop is. We need to be able to detect this.
-		
 		
 		\begin{lstlisting}
 for(int i = 0; i < output_size; i++){
@@ -536,9 +553,8 @@ for(int i = 0; i < output_size; i++){
 		When \texttt{i = 2} and \texttt{j = 2}, the resulting table looks like:
 		
 		
-		
 		\subsection{Registers/Stack}
-			
+		
 			
 	\section{Motivation}
 	
