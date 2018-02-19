@@ -384,13 +384,13 @@
 		
 		\subsection{What is Loop level parallelism?}
 		
-		Loop level parallelism occurs when every iteration of the loop can be run independently from every other iteration. 
-		
 		First, an overview of terminology. A loop is when the same code executes over and over on different data. An loop iteration is a single execution of the code in the loop. Two loop iterations are independent if the later iteration does not use data computed by the prior iteration. 
+		
+		Loop level parallelism occurs when every iteration of the loop can be run independently from every other iteration. 
 		
 		\subsection{Examples of Loop level parallelism}
 		
-		Here is code that performs a vector-scalar multiply operation. 
+		Here is code that performs vector-scalar multiplication on vector B with n dimensions. 
 		
 		\begin{lstlisting}
 for(int i = 0; i < n; i++){
@@ -408,17 +408,17 @@ for(int i = 1; i < n; i++){
 }
 		\end{lstlisting}
 		
-		This loop is not parallelizable. A given iteration \texttt{B[i] = B[i-1] + A[i];} for \texttt{i > 1} cannot be computed correctly until \texttt{B[i-1]} is calculated. So the loop must be executed in a particular order, so it is not parallelizable. 
+		This loop is not parallelizable. For \texttt{i > 1}, \texttt{B[i] = B[i-1] + A[i];} for  cannot be computed correctly until \texttt{B[i-1]} is calculated. The loop must be executed in a particular order, so it is not parallelizable. 
 		
 		\subsection{Desirable qualities of loop level parallelism}
 		
-		A huge amount of work in research and tool development has been devoted to exploiting loop level parallelism. Many automatic parallelizers and parallelism frameworks are focused on loop level parallelism. OpenMP is a C and C++ parallelism framework that allows programmers to parallelize loops with a single line of code. Attempts at automatic parallelization have been primarily focused on loops. 
+		A huge amount of work in research and tool development has been devoted to exploiting loop level parallelism. Many automatic parallelizers and parallelism frameworks are focused on loop level parallelism. OpenMP is a C and C++ parallelism framework that allows programmers to parallelize loops (assuming they are parallelizable) on CPUs with a single line of code. Research in automatic parallelization has been focused mostly on loops. This work is following this tradition. 
 		
-		Loop level parallelism is important for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
+		Loop level parallelism is important to this work for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
 		
 		Of course, loops are very common in code. As prior work on loop parallelism has shown, a large number of these loops are parallel. 
 		
-		Loop level parallelism is part of a class of parallelism called massive parallelism That means that if the loop is reasonably large, it can be scaled to massively parallel hardware like GPUs or other kinds of accelerators. 
+		Loop level parallelism is part of a class of parallelism called massive parallelism. That means that if the loop is reasonably large, it can be scaled to massively parallel hardware like GPUs or other kinds of accelerators. 
 		
 		Parallelizing loops is also very simple for the programmer to reason about. With OpenMP, one can parallelize loops on CPUs with a one line directive. In lower level accelerator code, like OpenCL, it is still relatively easy to translate loops into parallel kernels, just by porting the inner part of the code to an kernel, and run it on all the iterations of the loop in parallel 
 		
@@ -455,21 +455,18 @@ goto line 2
 		
 	\section{The baseline algorithm: The pairwise method}
 	
-		One of the goals of this thesis is to build a tool that tracks dependencies in loops. 
+		One of the goals of this thesis is to create a tool that identifies loop level parallelism. The literature has several methods to identify this type of parallelism. A particularly simple method is the naive pairwise method. This thesis's implementation will be an optimization of the pairwise method, so the naive version will be described in detail here. 
 		
-		This paper's goal is to design and implement an efficient algorithm for determining parallelism of loops and tracking where dependencies are in code. This section introduces a simple method which can gather the necessary information to do this dependency tracking. 
+		Recall that loop parallelism occurs when each iteration of a loop can be executed independently from every other iteration, and that independence means that one iteration doesn't depend on data computed by another iteration. 
+		The pairwise method tracks reads and writes to memory to determine dependences. Each read is considered to be an input to the computation in the loop, and each write is an output. If one loop iteration reads from one location in memory and a later one writes to that same location, then that is dependence that should be recorded, as it inhibits parallelism. 
 		
-		Recall that loop parallelism occurs when each iteration of loop can be executed independently from every other iteration, and that independence means that one iteration doesn't depend on data computed by another iteration. 
-		The pairwise method tracks dependencies as reads and writes to memory. Each read is considered to be an input to the computation in the loop, and each write is an output. So if one loop iteration reads from one bit of memory and a later one writes to that same byte of memory, then that is a dependence that should be recorded. 
+		There is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if a location in memory is written to before it is read in a loop iteration, then it is "killed." Reads of killed memory locations are not tracked in that iteration. This is because, the information stored in killed memory addresses is generated within the loop, and so there is no cross-loop dependence. 
 		
-		There is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if memory is written to before it is read in a loop iteration, then it is "killed", and further reads in that iteration will not be tracked for dependencies. 
-		
-		So the pairwise method stores 3 different structures for a particular loop. 
+		The pairwise method stores 3 different structures for a particular loop. 
 		
 		\begin{itemize}
 			\item history table: A table of reads and writes of previous loop iterations.
-			\item pending table: A table of reads and writes of the current loop iteration
-			\item killed bits: A set of instructions which were written before read in the current loop instance. 
+			\item pending table: A table of reads and writes of the current loop iteration.
 		\end{itemize}
 	
 		All of this becomes more clear with examples.
