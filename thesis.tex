@@ -473,65 +473,70 @@ goto line 2
 		
 		
 		
-		\subsection{Simple demonstration}
-		
-		Here is the cumulative sum procedure, written in terms of reads and writes
-		
-		\begin{lstlisting}
-for(int i = 1; i < n; i++){
-	READ B[i-1]
-	READ  A[i]
-	WRITE B[i]
-}
-		\end{lstlisting}
-		
-		So when the loop is executed, it creates a stream of information which is fed into the pairwise method algorithm. 
-		\begin{lstlisting}
-LOOP START
-LINE 2 READ B[0]
-LINE 3 READ  A[1]
-LINE 4 WRITE B[1]
-LOOP ITERATION
-LINE 2 READ B[1]
-LINE 3 READ  A[2]
-LINE 4 WRITE B[2]
-LOOP ITERATION
-...
-LOOP END
-		\end{lstlisting}
-		
-		This information is read and processed in the tables. 
-		
-		Here is the state of the history and pending tables at the end of the 3rd loop iteration. 
-		
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{Pending Table} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			2 & B[2] & R \\ 
-			3 & A[3] & R \\ 
-			4 & B[3] & W \\ 
-			\hline
-		\end{tabular}
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{History Table} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			2 & B[0] & R \\ 
-			3 & A[1] & R \\ 
-			4 & B[1] & W \\ 
-			2 & B[1] & R \\ 
-			3 & A[2] & R \\ 
-			4 & B[2] & W \\ 
-			\hline
-		\end{tabular}
-		
-		Here, there is a conflict at memory address at B[2] between instr 4 in the history table and instr 2 in the pending table. So this will be logged as a loop dependency. 
-		
+%		\subsection{Simple demonstration}
+%		
+%		Here is the cumulative sum procedure, written in terms of reads and writes.
+%		
+%		\begin{lstlisting}
+%for(int i = 1; i < n; i++){
+%	B[i] = B[i-1] + A[i];
+%}
+%		\end{lstlisting}
+%		\begin{lstlisting}
+%for(int i = 1; i < n; i++){
+%	READ B[i-1]
+%	READ  A[i]
+%	WRITE B[i]
+%}
+%		\end{lstlisting}
+%		
+%		So when the loop is executed, it creates a stream of information which is fed into the pairwise method algorithm. 
+%		\begin{lstlisting}
+%LOOP START
+%LINE 2 READ B[0]
+%LINE 3 READ  A[1]
+%LINE 4 WRITE B[1]
+%LOOP ITERATION
+%LINE 2 READ B[1]
+%LINE 3 READ  A[2]
+%LINE 4 WRITE B[2]
+%LOOP ITERATION
+%...
+%LOOP END
+%		\end{lstlisting}
+%		
+%		This information is read and processed in the tables. 
+%		
+%		Here is the state of the history and pending tables at the end of the 3rd loop iteration. 
+%		
+%		\begin{tabular}{ |c|c|c| } 
+%			\hline
+%			\multicolumn{3}{|c|}{Pending Table} \\
+%			\hline
+%			Instr & Memory & R/W \\ 
+%			\hline
+%			2 & B[2] & R \\ 
+%			3 & A[3] & R \\ 
+%			4 & B[3] & W \\ 
+%			\hline
+%		\end{tabular}
+%		\begin{tabular}{ |c|c|c| } 
+%			\hline
+%			\multicolumn{3}{|c|}{History Table} \\
+%			\hline
+%			Instr & Memory & R/W \\ 
+%			\hline
+%			2 & B[0] & R \\ 
+%			3 & A[1] & R \\ 
+%			4 & B[1] & W \\ 
+%			2 & B[1] & R \\ 
+%			3 & A[2] & R \\ 
+%			4 & B[2] & W \\ 
+%			\hline
+%		\end{tabular}
+%		
+%		Here, there is a conflict at memory address at B[2] between instr 4 in the history table and instr 2 in the pending table. So this will be logged as a loop dependency. 
+%		
 		\subsection{Nested loop demonstration}
 		
 		Now, this method also needs to work for nested loops.  
@@ -540,15 +545,137 @@ LOOP END
 		
 		\begin{lstlisting}
 for(int i = 0; i < output_size; i++){
-	y[i] = 0
+	tmp = 0
 	for(int j = 0; j < input_size; j++){
-		y[i] += M[i][j] * x[j]
+		tmp += M[i][j] * x[j]
 	}
+	y[i] = tmp
+}
+		\end{lstlisting}
+
+		\begin{lstlisting}
+for(int i = 0; i < output_size; i++){
+	sum = 0					//WRITE sum
+	for(int j = 0; j < input_size; j++){
+		tmp1 = x[j]			//READ  x[j]
+		tmp2 = M[i][j]		//READ  M[i][j]
+		tmp3 = sum			//READ  sum
+		tmp4 = tmp1 * tmp2
+		tmp5 = tmp3 + tmp4
+		sum = tmp5			//WRITE sum
+	}
+	tmp6 = sum 				//READ sum
+	y[i] = tmp6				//WRITE y[i]
 }
 		\end{lstlisting}
 		
-		When \texttt{i = 2} and \texttt{j = 2}, the resulting table looks like:
+
+		So when the loop is executed, it creates a stream of information which is fed into the pairwise method algorithm. 
 		
+		\begin{lstlisting}
+LOOP 1 START
+LINE 2 WRITE sum
+LOOP 3 START
+LINE 4 READ x[0]
+LINE 5 READ M[0][0]
+LINE 6 READ sum
+LINE 9 WRITE sum
+LOOP 3 ITERATION
+LINE 4 READ x[1]
+LINE 5 READ M[0][1]
+LINE 6 READ sum
+LINE 9 WRITE sum
+LOOP 3 ITERATION
+...
+LOOP 3 END
+LINE 11 READ sum
+LINE 12 WRITE y[0]
+LOOP 1 ITERATION
+...
+LOOP 1 END
+		\end{lstlisting}
+		
+		
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Pending Table LOOP 3} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline 
+			4 & x[0] & R \\ 
+			5 & M[0][0] & R \\
+			6 & sum & R \\ 
+			9 & sum & W \\ 
+			\hline
+		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table LOOP 3} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			\hline
+		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Pending Table LOOP 1} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			2 & sum & W \\
+			\hline
+		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table LOOP 1} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			\hline
+		\end{tabular}	
+	
+		
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Pending Table LOOP 3} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline 
+			4 & x[1] & R \\ 
+			5 & M[0][1] & R \\
+			6 & sum & R \\ 
+			9 & sum & W \\ 
+			\hline
+		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table LOOP 3} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			4 & x[0] & R \\ 
+			5 & M[0][0] & R \\
+			6 & sum & R \\ 
+			9 & sum & W \\ 
+			\hline
+		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Pending Table LOOP 1} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			2 & sum & W \\
+			\hline
+		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table LOOP 1} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			\hline
+		\end{tabular}	
 		
 		\subsection{Registers/Stack}
 		
