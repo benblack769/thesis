@@ -462,64 +462,120 @@ goto line 2
 		
 		There is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if a location in memory is written to before it is read in a loop iteration, then it is "killed." Reads of killed memory locations are not tracked in that iteration. This is because, the information stored in killed memory addresses is generated within the loop, and so there is no cross-loop dependence. 
 		
-		The pairwise method stores 3 different structures for a particular loop. 
+		The pairwise method stores 2 different structures for a particular loop. 
 		
 		\begin{itemize}
 			\item history table: A table of reads and writes of previous loop iterations.
 			\item pending table: A table of reads and writes of the current loop iteration.
 		\end{itemize}
 	
-		All of this becomes more clear with examples.
+		The pairwise method determines dependencies only using this data. The next section illustrates the method with examples. 
+		
+		\subsection{Simple demonstration}
+		
+		% cumulative sum repeat
+		%		\begin{lstlisting}
+		%for(int i = 1; i < n; i++){
+		%	B[i] = B[i-1] + A[i];
+		%}
+		%		\end{lstlisting}
+		
+		Here is the cumulative sum procedure from the loop level parreleism example section, written to show only the reads and writes to memory.
+				
+		\begin{lstlisting}
+for(int i = 1; i < n; i++){
+	READ B[i-1]
+	READ  A[i]
+	WRITE B[i]
+}
+		\end{lstlisting}
+		
+		When the loop is executed, the code then reads and writes to the arrays. This read and write information is combined with information about how the loop iterates. For example, here is how the above code would be processed when executed. 
+		
+		\begin{lstlisting}
+LOOP START
+LINE 2 READ B[0]
+LINE 3 READ  A[1]
+LINE 4 WRITE B[1]
+LOOP ITERATION
+LINE 2 READ B[1]
+LINE 3 READ  A[2]
+LINE 4 WRITE B[2]
+LOOP ITERATION
+...
+LOOP END
+		\end{lstlisting}
+		
+		This combined information is the input to the pairwise method. Now, the actual process of the pairwise method will be described. 
+		
+		When the loop starts, the pending table and history table are empty. As the first iteration is processed, reads and writes are put into the pending table. Right before the first iteration ends, the pending table looks like this:
 		
 		
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Pending Table} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			2 & B[0] & R \\ 
+			3 & A[1] & R \\ 
+			4 & B[1] & W \\ 
+			\hline
+		\end{tabular}
 		
-%		\subsection{Simple demonstration}
-%		
-%		Here is the cumulative sum procedure, written in terms of reads and writes.
-%		
-%		\begin{lstlisting}
-%for(int i = 1; i < n; i++){
-%	B[i] = B[i-1] + A[i];
-%}
-%		\end{lstlisting}
-%		\begin{lstlisting}
-%for(int i = 1; i < n; i++){
-%	READ B[i-1]
-%	READ  A[i]
-%	WRITE B[i]
-%}
-%		\end{lstlisting}
-%		
-%		So when the loop is executed, it creates a stream of information which is fed into the pairwise method algorithm. 
-%		\begin{lstlisting}
-%LOOP START
-%LINE 2 READ B[0]
-%LINE 3 READ  A[1]
-%LINE 4 WRITE B[1]
-%LOOP ITERATION
-%LINE 2 READ B[1]
-%LINE 3 READ  A[2]
-%LINE 4 WRITE B[2]
-%LOOP ITERATION
-%...
-%LOOP END
-%		\end{lstlisting}
-%		
+		At this point, the history table is still empty. But as the first iteration ends, the pending table is merged into the history table. 
+		
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Pending Table} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			\hline
+		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			2 & B[0] & R \\ 
+			3 & A[1] & R \\ 
+			4 & B[1] & W \\ 
+			\hline
+		\end{tabular}
+	
+		Right before the second iteration ends, the tables look like this:
+			
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Pending Table} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			2 & B[1] & R \\ 
+			3 & A[2] & R \\ 
+			4 & B[2] & W \\ 
+			\hline
+		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			2 & B[0] & R \\ 
+			3 & A[1] & R \\ 
+			4 & B[1] & W \\ 
+			\hline
+		\end{tabular}
+	
+		At the end of the second iteration, the pairwise method will look through the reads of the pending table, and see if there are any memory addresses in the history table that are writes. In this case, B[1] is written by line 4 in the history table, and is read by line 2 in the pending table. So a dependence between line 4 and 2 will be logged. 
+%	
 %		This information is read and processed in the tables. 
 %		
 %		Here is the state of the history and pending tables at the end of the 3rd loop iteration. 
 %		
-%		\begin{tabular}{ |c|c|c| } 
-%			\hline
-%			\multicolumn{3}{|c|}{Pending Table} \\
-%			\hline
-%			Instr & Memory & R/W \\ 
-%			\hline
-%			2 & B[2] & R \\ 
-%			3 & A[3] & R \\ 
-%			4 & B[3] & W \\ 
-%			\hline
-%		\end{tabular}
 %		\begin{tabular}{ |c|c|c| } 
 %			\hline
 %			\multicolumn{3}{|c|}{History Table} \\
@@ -536,12 +592,12 @@ goto line 2
 %		\end{tabular}
 %		
 %		Here, there is a conflict at memory address at B[2] between instr 4 in the history table and instr 2 in the pending table. So this will be logged as a loop dependency. 
-%		
+		
 		\subsection{Nested loop demonstration}
 		
 		Now, this method also needs to work for nested loops.  
 		
-		In this vector-matrix multiplication procedure, the inner loop is not parallel, but the outer loop is. We need to be able to detect this.
+		In this vector-matrix multiplication procedure, the inner loop is not parallel, but the outer loop is. The pairwise method will be able to detect this. 
 		
 		\begin{lstlisting}
 for(int i = 0; i < output_size; i++){
@@ -552,11 +608,13 @@ for(int i = 0; i < output_size; i++){
 	y[i] = tmp
 }
 		\end{lstlisting}
+		
+		The pairwise method sees the loops as sequences of reads and writes, and loop info. Here is the same procedure as above, but with each read and write on a separate line. Later, the line numbers will be referred to in place of machine code instruction addresses. 
 
 		\begin{lstlisting}
-for(int i = 0; i < output_size; i++){
+for(int i = 0; i < output_size; i++){	 //LOOP 1
 	sum = 0					//WRITE sum
-	for(int j = 0; j < input_size; j++){
+	for(int j = 0; j < input_size; j++){ //LOOP 2
 		tmp1 = x[j]			//READ  x[j]
 		tmp2 = M[i][j]		//READ  M[i][j]
 		tmp3 = sum			//READ  sum
@@ -569,25 +627,24 @@ for(int i = 0; i < output_size; i++){
 }
 		\end{lstlisting}
 		
-
-		So when the loop is executed, it creates a stream of information which is fed into the pairwise method algorithm. 
+		So when the loop is executed, it creates a stream of information which is fed into the pairwise method algorithm. Here is an example of that. 
 		
 		\begin{lstlisting}
 LOOP 1 START
 LINE 2 WRITE sum
-LOOP 3 START
+LOOP 2 START
 LINE 4 READ x[0]
 LINE 5 READ M[0][0]
 LINE 6 READ sum
 LINE 9 WRITE sum
-LOOP 3 ITERATION
+LOOP 2 ITERATION
 LINE 4 READ x[1]
 LINE 5 READ M[0][1]
 LINE 6 READ sum
 LINE 9 WRITE sum
-LOOP 3 ITERATION
+LOOP 2 ITERATION
 ...
-LOOP 3 END
+LOOP 2 END
 LINE 11 READ sum
 LINE 12 WRITE y[0]
 LOOP 1 ITERATION
@@ -595,10 +652,12 @@ LOOP 1 ITERATION
 LOOP 1 END
 		\end{lstlisting}
 		
+		Note that in the implementation both loops will be defined by the instruction address where they start at, and lines will be notated by their instruction address.
+		
 		
 		\begin{tabular}{ |c|c|c| } 
 			\hline
-			\multicolumn{3}{|c|}{Pending Table LOOP 3} \\
+			\multicolumn{3}{|c|}{Pending Table LOOP 2} \\
 			\hline
 			Instr & Memory & R/W \\ 
 			\hline 
@@ -610,7 +669,7 @@ LOOP 1 END
 		\end{tabular}
 		\begin{tabular}{ |c|c|c| } 
 			\hline
-			\multicolumn{3}{|c|}{History Table LOOP 3} \\
+			\multicolumn{3}{|c|}{History Table LOOP 2} \\
 			\hline
 			Instr & Memory & R/W \\ 
 			\hline
@@ -632,12 +691,12 @@ LOOP 1 END
 			Instr & Memory & R/W \\ 
 			\hline
 			\hline
-		\end{tabular}	
+		\end{tabular} 
 	
 		
 		\begin{tabular}{ |c|c|c| } 
 			\hline
-			\multicolumn{3}{|c|}{Pending Table LOOP 3} \\
+			\multicolumn{3}{|c|}{Pending Table LOOP 2} \\
 			\hline
 			Instr & Memory & R/W \\ 
 			\hline 
@@ -649,7 +708,7 @@ LOOP 1 END
 		\end{tabular}
 		\begin{tabular}{ |c|c|c| } 
 			\hline
-			\multicolumn{3}{|c|}{History Table LOOP 3} \\
+			\multicolumn{3}{|c|}{History Table LOOP 2} \\
 			\hline
 			Instr & Memory & R/W \\ 
 			\hline
@@ -677,7 +736,75 @@ LOOP 1 END
 			\hline
 		\end{tabular}	
 		
-		\subsection{Registers/Stack}
+	\section{Prior work on optimizing the pairwise method}
+		
+		Naive implementations of the pairwise method have severe time overhead that limit the usefulness of the method. This paper follows the tracks of the SD3 paper in reducing memory overhead through compression. This section gives an overview of the memory considerations involved with the pairwise method, and prior attempts to fix this by compressing the working memory. 
+		
+		\subsection{Memory overhead of pairwise method}
+		
+		The pairwise method often uses more working memory than ordinary systems have. The SD3 paper\footnote{\cite{text}} mentions commercial tools which take roughly 100x the time and 100x the memory of the program being profiled. The tested their implementation of the naive method on 17 SPEC 2006 C/C++ benchmarks. They found that 14 of them used more than 12gb of memory, and so could not be run on their system. Out of the 14 benchmarks that used over 12gb of memory to run, 9 used under 100mb memory under native execution, so memory overhead was over 120x for all 9 of these. 
+		
+		This suggests that ordinary users will not be able to profile important pieces of software on production inputs, limiting the usefulness of the tool.
+		
+		\subsection{Analysis of memory efficiency}
+		
+		The pairwise method is inefficient because it needs to store memory for every unique \texttt{(memory address, instruction, R/W)} tuple in every loop on the current stack of loops. An implementation using standard, unoptimized data structures might take 32 bytes or more to store each of these tuples. A history table storing all of the current working memory may then take at least 8 times the original working memory of the loop (assuming 4 byte word accesses). But perhaps substantially more, since the same memory address might be accessed by different instructions, or memory accesses might be smaller. Then consider that an nested loop may access most of the program's memory, so the history and pending tables of the outer loops will have to store all of this memory as well. 
+		
+		
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Sources of memory overhead} \\
+			\hline
+			Source & Estimated Overhead & Overhead Reasonable Range \\ 
+			\hline 
+			Storing tuples instead of memory & 8 & 4-32 \\ 	\hline
+			Multiple instruction access & 3 & 2-20 \\ \hline
+			Nested loops & 3 & 1-20 \\ \hline
+			\hline
+			Total & 72 & 8-1000 \\ \hline
+		\end{tabular}
+	
+		Note that SD3's actual studies showed substantially higher overhead than 72x in general, showing that some of these are underestimates. 
+		
+		\subsection{Time efficiency of a compression method}
+		
+		Any compression method should be fast as well as memory efficient. 
+		Ordinary compression methods, such as statistical file compression, have a inverse relationship between space and time. The better the compression ratio, the longer the computation. But this is not always the case. Sometimes, compression can make computations faster, since you operate over smaller datasets. Since the pairwise method is so slow to begin with, additional time overhead is undesirable. So ideally, a compressed implementation of the pairwise method would use the same or less time than the naive implementation. All compression methods suggested have this property. 
+		
+		\subsection{Stride compression}
+		
+		The SD3 paper suggests compressing strides memory accesses.
+		
+		\subsubsection{What is a stride?}
+		
+		A stride is a range of locations which have a constant interval between elements. You can store it as a triple \texttt{(first, last, interval)}.
+		
+		For example, here is code that accesses an array of memory in a stride pattern. 
+		
+		\begin{lstlisting}
+for(int i = 1; i < 12; += 3){
+	B[i] = 1;
+}
+		\end{lstlisting}
+		
+		Assuming all elements of the array were set to 0, the resulting array would look like this.
+		
+		\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c|c|c|c| } 
+			\hline
+			B[0] & B[1] & B[2] & B[3] & B[4] & B[5] & B[6] & B[7] & B[9] & B[9] & B[10] & B[11] & B[12] \\
+			\hline
+			0 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 0 & 0 \\
+			\hline
+		\end{tabular}
+		
+		To track all of these memory accesses, the naive version would store list of values: \texttt{(1, 4, 7, 10)}. But this can be stored as a stride as well: \texttt{(first:1, last:10, interval:3)}. Note that 
+		
+		\subsubsection{Stride compression of the pairwise method}
+		
+		
+		\subsection{Bit compression}
+		
+		
 		
 			
 	\section{Motivation}

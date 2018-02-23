@@ -13,6 +13,7 @@ linux_copy
 *.cb2
 SD3
 LoopProf
+template
 
 ## Intermediate documents:
 *.dvi
