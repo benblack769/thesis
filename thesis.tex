@@ -506,7 +506,7 @@ LOOP ITERATION
 LOOP END
 		\end{lstlisting}
 		
-		This combined information is the input to the pairwise method. Now, the actual process of the pairwise method will be described. 
+		This combined information is the input to the pairwise method. Note that in the implementation, lines will be notated by their instruction address, not the line number. Now, the actual process of the pairwise method will be described. 
 		
 		When the loop starts, the pending table and history table are empty. As the first iteration is processed, reads and writes are put into the pending table. Right before the first iteration ends, the pending table looks like this:
 		
@@ -522,8 +522,17 @@ LOOP END
 			4 & B[1] & W \\ 
 			\hline
 		\end{tabular}
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			\hline
+		\end{tabular}
 		
-		At this point, the history table is still empty. But as the first iteration ends, the pending table is merged into the history table. 
+		The history table is still empty, as there were no previous iterations of the loop. But as the first iteration ends, the pending table is merged into the history table. 
+		
 		
 		\begin{tabular}{ |c|c|c| } 
 			\hline
@@ -570,32 +579,11 @@ LOOP END
 			\hline
 		\end{tabular}
 	
-		At the end of the second iteration, the pairwise method will look through the reads of the pending table, and see if there are any memory addresses in the history table that are writes. In this case, B[1] is written by line 4 in the history table, and is read by line 2 in the pending table. So a dependence between line 4 and 2 will be logged. 
-%	
-%		This information is read and processed in the tables. 
-%		
-%		Here is the state of the history and pending tables at the end of the 3rd loop iteration. 
-%		
-%		\begin{tabular}{ |c|c|c| } 
-%			\hline
-%			\multicolumn{3}{|c|}{History Table} \\
-%			\hline
-%			Instr & Memory & R/W \\ 
-%			\hline
-%			2 & B[0] & R \\ 
-%			3 & A[1] & R \\ 
-%			4 & B[1] & W \\ 
-%			2 & B[1] & R \\ 
-%			3 & A[2] & R \\ 
-%			4 & B[2] & W \\ 
-%			\hline
-%		\end{tabular}
-%		
-%		Here, there is a conflict at memory address at B[2] between instr 4 in the history table and instr 2 in the pending table. So this will be logged as a loop dependency. 
+		At the end of the second iteration, the pairwise method will look through the reads of the pending table, and see if there are any memory addresses in the history table that are writes. In this case, B[1] is written by line 4 in the history table, and is read by line 2 in the pending table. So a dependence between line 4 and 2 will be logged. And so the pairwise method correctly identifies that the loop is not parallel. 
 		
 		\subsection{Nested loop demonstration}
 		
-		Now, this method also needs to work for nested loops.  
+		Now, this method also works efficiently for nested loops, like the example below.  
 		
 		In this vector-matrix multiplication procedure, the inner loop is not parallel, but the outer loop is. The pairwise method will be able to detect this. 
 		
@@ -609,7 +597,7 @@ for(int i = 0; i < output_size; i++){
 }
 		\end{lstlisting}
 		
-		The pairwise method sees the loops as sequences of reads and writes, and loop info. Here is the same procedure as above, but with each read and write on a separate line. Later, the line numbers will be referred to in place of machine code instruction addresses. 
+		The pairwise method sees the loops as sequences of reads and writes, and loop info. Here is the same procedure as above, but with each read and write on a separate line, so we can refer to reads and writes by line number. 
 
 		\begin{lstlisting}
 for(int i = 0; i < output_size; i++){	 //LOOP 1
@@ -627,114 +615,7 @@ for(int i = 0; i < output_size; i++){	 //LOOP 1
 }
 		\end{lstlisting}
 		
-		So when the loop is executed, it creates a stream of information which is fed into the pairwise method algorithm. Here is an example of that. 
 		
-		\begin{lstlisting}
-LOOP 1 START
-LINE 2 WRITE sum
-LOOP 2 START
-LINE 4 READ x[0]
-LINE 5 READ M[0][0]
-LINE 6 READ sum
-LINE 9 WRITE sum
-LOOP 2 ITERATION
-LINE 4 READ x[1]
-LINE 5 READ M[0][1]
-LINE 6 READ sum
-LINE 9 WRITE sum
-LOOP 2 ITERATION
-...
-LOOP 2 END
-LINE 11 READ sum
-LINE 12 WRITE y[0]
-LOOP 1 ITERATION
-...
-LOOP 1 END
-		\end{lstlisting}
-		
-		Note that in the implementation both loops will be defined by the instruction address where they start at, and lines will be notated by their instruction address.
-		
-		
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{Pending Table LOOP 2} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline 
-			4 & x[0] & R \\ 
-			5 & M[0][0] & R \\
-			6 & sum & R \\ 
-			9 & sum & W \\ 
-			\hline
-		\end{tabular}
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{History Table LOOP 2} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			\hline
-		\end{tabular}
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{Pending Table LOOP 1} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			2 & sum & W \\
-			\hline
-		\end{tabular}
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{History Table LOOP 1} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			\hline
-		\end{tabular} 
-	
-		
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{Pending Table LOOP 2} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline 
-			4 & x[1] & R \\ 
-			5 & M[0][1] & R \\
-			6 & sum & R \\ 
-			9 & sum & W \\ 
-			\hline
-		\end{tabular}
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{History Table LOOP 2} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			4 & x[0] & R \\ 
-			5 & M[0][0] & R \\
-			6 & sum & R \\ 
-			9 & sum & W \\ 
-			\hline
-		\end{tabular}
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{Pending Table LOOP 1} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			2 & sum & W \\
-			\hline
-		\end{tabular}
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{History Table LOOP 1} \\
-			\hline
-			Instr & Memory & R/W \\ 
-			\hline
-			\hline
-		\end{tabular}	
 		
 	\section{Prior work on optimizing the pairwise method}
 		
