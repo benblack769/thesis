@@ -370,6 +370,7 @@
 \chapter{Dynamic parallelism detection}
 
 	\section{Introduction}
+	
 		We need a way of determining parallelism in order to do any useful inference on hardware compatibility. But, also recall that our end goals are much larger than just that. We are looking at a wide vision of a tool that helps the programmer understand their code, and help them to improve the algorithms and prototype them for better fitness on different hardware without actually dealing with the hardware. So we not only want a parallelism tool that figures out which parts of the code can be parallelized or not, but a tool that helps the programmer understand why code might not be parallelizable, and perhaps how to fix it. 
 		 
 		We came to the conclusion that current open source parallelism detection tools do not meet our efficiency and accuracy requirements, and so we built our own tool which does meet our needs. 
@@ -378,19 +379,20 @@
 		
 	\section{Loop level parallelism}
 	
-		Parallelism exists in different code structures, and at different levels of granularity. Programmers talk about how parallelism manifests itself in code. These include task parallelism (executing different functions in parallel), and  loop parallelism (running different parts of a loop in parallel). Computer architects talk about different ways parallelism manifests in hardware, including instruction level parallelism, thread level parallelism, and memory level parallelism. 
+		Parallelism exists in different code structures and at different levels of granularity. Programmers talk about how parallelism manifests itself in code. These include task parallelism (executing different functions in parallel) and  loop parallelism (running different parts of a loop in parallel). Computer architects talk about different parallelism can be exploited in hardware, including instruction level parallelism, thread level parallelism, and memory level parallelism. 
 		
 		This thesis focuses on loop level parallelism (LLP). This type of parallelism is common, easy to detect, scalable on massively parallel processors, and simple for programmers to reason about. 
 		
 		\subsection{What is Loop level parallelism?}
 		
-		First, an overview of terminology. A loop is when the same code executes over and over on different data. An loop iteration is a single execution of the code in the loop. Two loop iterations are independent if the later iteration does not use data computed by the prior iteration. 
+		We start by introducing some terminology. A loop is a code construct that executes the same instructions over and over on different data. A loop iteration is a single execution of the code in the loop. Two loop iterations are independent if the later iteration does not use data computed by the prior iteration. 
 		
-		Loop level parallelism occurs when every iteration of the loop can be run independently from every other iteration. 
+		Loop level parallelism exists when every iteration of the loop can be run independently from every other iteration. 
 		
 		\subsection{Examples of Loop level parallelism}
 		
-		Here is code that performs vector-scalar multiplication on vector B with n dimensions. 
+		Here is code that performs in-place vector-scalar multiplication on a vector B with n elements. 
+		%The loop executes n times, multiplying a different element of B each time. 
 		
 		\begin{lstlisting}
 for(int i = 0; i < n; i++){
@@ -398,7 +400,7 @@ for(int i = 0; i < n; i++){
 }
 		\end{lstlisting}
 		
-		This loop is parallelizable. In this loop, an iteration is simply the calculation of \texttt{B[i] = B[i] * c} for some \texttt{0 <= i < n}. Clearly any of these iterations can be executed before any other one. So you can compute them in any order, without affecting correctness, so it is parallelizable. 
+		This loop is parallelizable. In this loop, each iteration is simply the calculation of \texttt{B[i] = B[i] * c} for some \texttt{0 <= i < n}. Therefore, any of these iterations can be executed before any other one. So you can compute them in any order, without affecting correctness, so it is parallelizable. 
 		
 		To contrast, here is code that performs a cumulative sum. 
 		
@@ -424,20 +426,30 @@ for(int i = 1; i < n; i++){
 		
 		Lastly, loop level parallelism is easy to detect. The next section will give a simple algorithm to detect this. Other kinds of massive parallelism require more sophisticated analysis. 
 		
+		
 		\subsection{Dynamic Loop Detection}
 		
-		Simply determining where loops start and end is a challenging problem. 
-		Loops have a clean structure in high languages like C. It is easy for both the machine and a human to understand what code is inside them, and when they start and end. However, this paper focused on dynamic analysis of loops. And doing dynamic analysis requires us to understand the structure of loops in machine code, as there is not always a precise mapping from machine code to source code. And loops in machine code are simply difficult to work with, as they are implemented with "go to" instructions.
+		Dynamic loop level parreleism detection requires a determination of when the loop start, ends, and iterates in a running program.
+		This is a surprisingly challenging problem. 
+		Loops have a clean structure in high level languages like C. It is easy for both the compiler and a human to understand what code is inside them, and when they start and end. However, this paper focuses on the dynamic analysis of loops. Doing dynamic analysis requires us to understand the structure of loops in machine code, as there is not always a precise mapping from machine code to source code. And loops in machine code are harder to detect, as they are implemented with "go to" instructions.
 		
-		To demonstrate how this makes analysis difficult, here is the standard way of translating the above vector-scalar multiply loop into machine code. 
+		To demonstrate the difficulty of finding loops in machine code, here is the standard way of translating the above vector-scalar multiply loop into machine code:
 		
+
+		\begin{lstlisting}
+int i = 1;
+while(i < n){
+	B[i] = B[i-1] + A[i];
+	i++;
+}
+		\end{lstlisting}
 		\begin{lstlisting}
 i = 1
-i += 1
 if i >= n goto line 8
 tmp1 = B[i-1]
-tmp1 *= c
-B[i] = c
+tmp1 = tmp1 * c
+B[i] = tmp1
+i = i + 1
 goto line 2
 ...
 		\end{lstlisting}
@@ -589,20 +601,20 @@ LOOP END
 		
 		\begin{lstlisting}
 for(int i = 0; i < output_size; i++){
-	tmp = 0
+	sum = 0
 	for(int j = 0; j < input_size; j++){
-		tmp += M[i][j] * x[j]
+		sum += M[i][j] * x[j]
 	}
-	y[i] = tmp
+	y[i] = sum
 }
 		\end{lstlisting}
 		
-		The pairwise method sees the loops as sequences of reads and writes, and loop info. Here is the same procedure as above, but with each read and write on a separate line, so we can refer to reads and writes by line number. 
+		The pairwise method sees the loops as sequences of reads and writes, and loop info. Here is the same procedure as above, but with each read and write on a separate line, so we can refer to reads and writes by line number.
 
 		\begin{lstlisting}
-for(int i = 0; i < output_size; i++){	 //LOOP 1
+for(int i = 0; i < output_size; i++){	 	//outer loop
 	sum = 0					//WRITE sum
-	for(int j = 0; j < input_size; j++){ //LOOP 2
+	for(int j = 0; j < input_size; j++){ 	// inner loop
 		tmp1 = x[j]			//READ  x[j]
 		tmp2 = M[i][j]		//READ  M[i][j]
 		tmp3 = sum			//READ  sum
@@ -616,7 +628,32 @@ for(int i = 0; i < output_size; i++){	 //LOOP 1
 		\end{lstlisting}
 		
 		
+		As the outer loop starts, line 2 writes to the memory address of \texttt{sum}. This is put into the pending table of the outer loop. Then the inner loop starts. An empty pending and an empty history table are created for the inner loop. These tables are separate from the outer loop's tables.
 		
+		The inner loop is processed very similarly to the cumulative sum example before. A loop dependence on \texttt{sum} between lines 6 and 9 is logged for the outer loop.
+		
+		When the inner loop finishes, the history table is merged into the pending table of the inner loop. So all of the the reads of arrays \texttt{x} and \texttt{M[i]} are put in the pending table of the inner loop. But in that pending table, \texttt{sum} is written to but not read. So it is killed, and so none of the reads or writes to \texttt{sum} will be put in the pending table. When line 11 is executed, this read also is not put in the pending table. 
+		So at the end of the first iteration, pending table will be
+			
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{Pending Table (inner loop)} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			2 & sum & W \\ 
+			4 & x[0-input-size] & R \\ 
+			5 & M[0][0-input-size] & R \\ 
+			12 & y[0] & W \\
+			\hline
+		\end{tabular}
+	
+		Here x[0-input-size] is shorthand for separate entries for x[0], x[1],...,x[input-size - 1].
+		
+		This table will be merged into the history table of the outer loop, and the process will repeat. Note that there will not be any read after write dependence logged, since \text{sum} and \texttt{y[i]} are only written to, and \texttt{x[j]} and \texttt{M[i][[j]]} are only read from. So the pairwise method concludes that the outer loop is parallel. 
+		
+		And intuitively this is true, the outer loop can be parallelized trivially if the memory of \texttt{sum} if duplicated for each thread. 
+	
 	\section{Prior work on optimizing the pairwise method}
 		
 		Naive implementations of the pairwise method have severe time overhead that limit the usefulness of the method. This paper follows the tracks of the SD3 paper in reducing memory overhead through compression. This section gives an overview of the memory considerations involved with the pairwise method, and prior attempts to fix this by compressing the working memory. 
