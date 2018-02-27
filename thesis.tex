@@ -42,6 +42,14 @@
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
 
+
+
+\newenvironment{codeexample}[1][htb]
+{\floatname{algorithm}{Code Example}%\renewcommand{\algorithmcfname}{Code example}% Update algorithm name
+	\begin{algorithm}[#1]%
+	}{\end{algorithm}}
+
+
 \lstset
 { %Formatting for code in appendix
 	basicstyle=\footnotesize,
@@ -63,6 +71,8 @@
 
 \newcommand{\ceil}[1]{\lceil #1 \rceil}
 \newcommand{\floor}[1]{\lfloor #1 \rfloor}
+
+
 
 \title{My Final College Paper}
 \author{Your R. Name}
@@ -394,21 +404,27 @@
 		Here is code that performs in-place vector-scalar multiplication on a vector B with n elements. 
 		%The loop executes n times, multiplying a different element of B each time. 
 		
+		\begin{codeexample}
+			\caption{Vector-scalar multiply}\label{vec-scal-mul}
 		\begin{lstlisting}
 for(int i = 0; i < n; i++){
 	B[i] = B[i] * c;
 }
 		\end{lstlisting}
+		\end{codeexample}
 		
 		This loop is parallelizable. In this loop, each iteration is simply the calculation of \texttt{B[i] = B[i] * c} for some \texttt{0 <= i < n}. Therefore, any of these iterations can be executed before any other one. So you can compute them in any order, without affecting correctness, so it is parallelizable. 
 		
 		To contrast, here is code that performs a cumulative sum. 
 		
+		\begin{codeexample}
+			\caption{Cumulative Sum}\label{cum-sum}
 		\begin{lstlisting}
 for(int i = 1; i < n; i++){
 	B[i] = B[i-1] + A[i];
 }
 		\end{lstlisting}
+		\end{codeexample}
 		
 		This loop is not parallelizable. For \texttt{i > 1}, \texttt{B[i] = B[i-1] + A[i];} for  cannot be computed correctly until \texttt{B[i-1]} is calculated. The loop must be executed in a particular order, so it is not parallelizable. 
 		
@@ -469,10 +485,10 @@ goto line 2
 	
 		One of the goals of this thesis is to create a tool that identifies loop level parallelism. The literature has several methods to identify this type of parallelism. A particularly simple method is the naive pairwise method. This thesis's implementation will be an optimization of the pairwise method, so the naive version will be described in detail here. 
 		
-		Recall that loop parallelism occurs when each iteration of a loop can be executed independently from every other iteration, and that independence means that one iteration doesn't depend on data computed by another iteration. 
-		The pairwise method tracks reads and writes to memory to determine dependences. Each read is considered to be an input to the computation in the loop, and each write is an output. If one loop iteration reads from one location in memory and a later one writes to that same location, then that is dependence that should be recorded, as it inhibits parallelism. 
+		Recall that loop level parallelism occurs when each iteration of a loop can be executed independently from every other iteration, and that independence means that one iteration does not depend on data computed by another iteration. 
+		The pairwise method tracks reads and writes to memory to determine dependences. Each read is considered to be an input to the computation in the loop, and each write is an output. If one loop iteration writes to one location in memory and a later one reads from that same location, then that is a dependence that should be recorded as it inhibits parallelism. 
 		
-		There is an importance difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, if a location in memory is written to before it is read in a loop iteration, then it is "killed." Reads of killed memory locations are not tracked in that iteration. This is because, the information stored in killed memory addresses is generated within the loop, and so there is no cross-loop dependence. 
+		There is an important difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, consider a location in memory that is written to before it is read in a loop iteration. Then the data that was previously at that location was overwritten,  we say the location is "killed." Reads of killed memory locations are not tracked in that iteration. This is because, the information stored in killed memory addresses is generated within the loop, and so there is no cross-loop dependence. 
 		
 		The pairwise method stores 2 different structures for a particular loop. 
 		
@@ -493,14 +509,13 @@ goto line 2
 		%		\end{lstlisting}
 		
 		Here is the cumulative sum procedure from the loop level parreleism example section, written to show only the reads and writes to memory.
-				
-		\begin{lstlisting}
+			\begin{lstlisting}
 for(int i = 1; i < n; i++){
-	READ B[i-1]
-	READ  A[i]
-	WRITE B[i]
+	tmp1 = B[i-1]		\\READ B[i-1]
+	tmp2 = A[i] 		\\READ A[i]
+	B[i] = tmp1 * tmp2	\\WRITE B[i]
 }
-		\end{lstlisting}
+			\end{lstlisting}
 		
 		When the loop is executed, the code then reads and writes to the arrays. This read and write information is combined with information about how the loop iterates. For example, here is how the above code would be processed when executed. 
 		
@@ -523,6 +538,9 @@ LOOP END
 		When the loop starts, the pending table and history table are empty. As the first iteration is processed, reads and writes are put into the pending table. Right before the first iteration ends, the pending table looks like this:
 		
 		
+		\begin{minipage}{1.0\linewidth}
+			\begin{minipage}[t]{.5\linewidth}
+				
 		\begin{tabular}{ |c|c|c| } 
 			\hline
 			\multicolumn{3}{|c|}{Pending Table} \\
@@ -534,6 +552,8 @@ LOOP END
 			4 & B[1] & W \\ 
 			\hline
 		\end{tabular}
+		\end{minipage}%
+		\begin{minipage}[t]{.5\linewidth}
 		\begin{tabular}{ |c|c|c| } 
 			\hline
 			\multicolumn{3}{|c|}{History Table} \\
@@ -542,11 +562,16 @@ LOOP END
 			\hline
 			\hline
 		\end{tabular}
+		\end{minipage}
+		\end{minipage}
 		
 		The history table is still empty, as there were no previous iterations of the loop. But as the first iteration ends, the pending table is merged into the history table. 
 		
 		
-		\begin{tabular}{ |c|c|c| } 
+		\begin{minipage}{1.0\linewidth}
+		\begin{minipage}[t]{.5\linewidth}
+		
+		\begin{tabular}[b]{ |c|c|c| } 
 			\hline
 			\multicolumn{3}{|c|}{Pending Table} \\
 			\hline
@@ -554,6 +579,8 @@ LOOP END
 			\hline
 			\hline
 		\end{tabular}
+		\end{minipage}%
+		\begin{minipage}[t]{.5\linewidth}
 		\begin{tabular}{ |c|c|c| } 
 			\hline
 			\multicolumn{3}{|c|}{History Table} \\
@@ -565,9 +592,13 @@ LOOP END
 			4 & B[1] & W \\ 
 			\hline
 		\end{tabular}
-	
+		\end{minipage}
+	\end{minipage}
+		
 		Right before the second iteration ends, the tables look like this:
 			
+		\begin{minipage}{1.0\linewidth}
+		\begin{minipage}[t]{.5\linewidth}
 		\begin{tabular}{ |c|c|c| } 
 			\hline
 			\multicolumn{3}{|c|}{Pending Table} \\
@@ -579,6 +610,8 @@ LOOP END
 			4 & B[2] & W \\ 
 			\hline
 		\end{tabular}
+		\end{minipage}%
+		\begin{minipage}[t]{.5\linewidth}
 		\begin{tabular}{ |c|c|c| } 
 			\hline
 			\multicolumn{3}{|c|}{History Table} \\
@@ -590,6 +623,8 @@ LOOP END
 			4 & B[1] & W \\ 
 			\hline
 		\end{tabular}
+		\end{minipage}%
+		\end{minipage}%
 	
 		At the end of the second iteration, the pairwise method will look through the reads of the pending table, and see if there are any memory addresses in the history table that are writes. In this case, B[1] is written by line 4 in the history table, and is read by line 2 in the pending table. So a dependence between line 4 and 2 will be logged. And so the pairwise method correctly identifies that the loop is not parallel. 
 		
@@ -599,6 +634,8 @@ LOOP END
 		
 		In this vector-matrix multiplication procedure, the inner loop is not parallel, but the outer loop is. The pairwise method will be able to detect this. 
 		
+		\begin{codeexample}
+			\caption{Matrix-vector multiply}\label{vec-mat-mul}
 		\begin{lstlisting}
 for(int i = 0; i < output_size; i++){
 	sum = 0
@@ -608,6 +645,7 @@ for(int i = 0; i < output_size; i++){
 	y[i] = sum
 }
 		\end{lstlisting}
+		\end{codeexample}
 		
 		The pairwise method sees the loops as sequences of reads and writes, and loop info. Here is the same procedure as above, but with each read and write on a separate line, so we can refer to reads and writes by line number.
 
