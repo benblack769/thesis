@@ -39,6 +39,7 @@
 \usepackage{natbib}
 \usepackage{listings}
 \usepackage{tikz}
+\usepackage{float}
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
 
@@ -488,7 +489,7 @@ goto line 2
 		Recall that loop level parallelism occurs when each iteration of a loop can be executed independently from every other iteration, and that independence means that one iteration does not depend on data computed by another iteration. 
 		The pairwise method tracks reads and writes to memory to determine dependences. Each read is considered to be an input to the computation in the loop, and each write is an output. If one loop iteration writes to one location in memory and a later one reads from that same location, then that is a dependence that should be recorded as it inhibits parallelism. 
 		
-		There is an important difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, consider a location in memory that is written to before it is read in a loop iteration. Then the data that was previously at that location was overwritten,  we say the location is "killed." Reads of killed memory locations are not tracked in that iteration. This is because, the information stored in killed memory addresses is generated within the loop, and so there is no cross-loop dependence. 
+		There is an important difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, consider a location in memory that is written to before it is read in a loop iteration. Then the data that was previously at that location was overwritten, so the current iteration will not depend on data at that location. In this case, we say the location is "killed." Reads of killed memory locations are not tracked in that iteration.
 		
 		The pairwise method stores 2 different structures for a particular loop. 
 		
@@ -508,7 +509,7 @@ goto line 2
 		%}
 		%		\end{lstlisting}
 		
-		Here is the cumulative sum procedure from the loop level parreleism example section, written to show only the reads and writes to memory.
+		Here is the cumulative sum procedure from the loop level parallelism example section, written to show only the reads and writes to memory.
 			\begin{lstlisting}
 for(int i = 1; i < n; i++){
 	tmp1 = B[i-1]		\\READ B[i-1]
@@ -517,7 +518,7 @@ for(int i = 1; i < n; i++){
 }
 			\end{lstlisting}
 		
-		When the loop is executed, the code then reads and writes to the arrays. This read and write information is combined with information about how the loop iterates. For example, here is how the above code would be processed when executed. 
+		When the loop is executed, the code reads and writes to the arrays. This read and write information is combined with information about how the loop iterates. For example, here is how the above code would be processed when executed. 
 		
 		\begin{lstlisting}
 LOOP START
@@ -533,13 +534,14 @@ LOOP ITERATION
 LOOP END
 		\end{lstlisting}
 		
-		This combined information is the input to the pairwise method. Note that in the implementation, lines will be notated by their instruction address, not the line number. Now, the actual process of the pairwise method will be described. 
+		This combined information is the input to the pairwise method. Note that in the implementation, lines will be notated by their instruction address, not the line number. 
 		
+		The actual process of the pairwise method can be seen in the tables below.
 		When the loop starts, the pending table and history table are empty. As the first iteration is processed, reads and writes are put into the pending table. Right before the first iteration ends, the pending table looks like this:
 		
 		
 		\begin{minipage}{1.0\linewidth}
-			\begin{minipage}[t]{.5\linewidth}
+		\begin{minipage}[t]{.5\linewidth}
 				
 		\begin{tabular}{ |c|c|c| } 
 			\hline
@@ -554,7 +556,7 @@ LOOP END
 		\end{tabular}
 		\end{minipage}%
 		\begin{minipage}[t]{.5\linewidth}
-		\begin{tabular}{ |c|c|c| } 
+		\begin{tabular}[b]{ |c|c|c| } 
 			\hline
 			\multicolumn{3}{|c|}{History Table} \\
 			\hline
@@ -626,13 +628,12 @@ LOOP END
 		\end{minipage}%
 		\end{minipage}%
 	
-		At the end of the second iteration, the pairwise method will look through the reads of the pending table, and see if there are any memory addresses in the history table that are writes. In this case, B[1] is written by line 4 in the history table, and is read by line 2 in the pending table. So a dependence between line 4 and 2 will be logged. And so the pairwise method correctly identifies that the loop is not parallel. 
+		At the end of the second iteration, the pairwise method will look through the reads of the pending table, and see if there are any memory addresses in the history table that are writes. In this case, the history table has a write at address B[1] by line 4, and the pending table has a read at B[1] by line 2. So a dependence between line 4 and 2 will be logged, avnd  the pairwise method correctly identifies that the loop is not parallel. 
 		
 		\subsection{Nested loop demonstration}
 		
-		Now, this method also works efficiently for nested loops, like the example below.  
-		
-		In this vector-matrix multiplication procedure, the inner loop is not parallel, but the outer loop is. The pairwise method will be able to detect this. 
+		This method also works for nested loops.  
+		In this vector-matrix multiplication procedure, presented here, the inner loop is not parallel but the outer loop is. The pairwise method will be able to detect this. 
 		
 		\begin{codeexample}
 			\caption{Matrix-vector multiply}\label{vec-mat-mul}
@@ -647,7 +648,7 @@ for(int i = 0; i < output_size; i++){
 		\end{lstlisting}
 		\end{codeexample}
 		
-		The pairwise method sees the loops as sequences of reads and writes, and loop info. Here is the same procedure as above, but with each read and write on a separate line, so we can refer to reads and writes by line number.
+		Here is the procedure from above, but with each read and write on a separate line, so we can refer to reads and writes by line number.
 
 		\begin{lstlisting}
 for(int i = 0; i < output_size; i++){	 	//outer loop
@@ -666,67 +667,98 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 		\end{lstlisting}
 		
 		
-		As the outer loop starts, line 2 writes to the memory address of \texttt{sum}. This is put into the pending table of the outer loop. Then the inner loop starts. An empty pending and an empty history table are created for the inner loop. These tables are separate from the outer loop's tables.
+		As the outer loop starts, line 2 writes to the memory address of \texttt{sum}. This is put into the pending table of the outer loop. Then the inner loop starts. Empty pending and history tables are created for the inner loop; these tables are separate from the outer loop's tables.
 		
-		The inner loop is processed very similarly to the cumulative sum example before. A loop dependence on \texttt{sum} between lines 6 and 9 is logged for the outer loop.
+		The inner loop is processed very similarly to the cumulative sum example from earlier. A loop dependence on \texttt{sum} between lines 6 and 9 is logged for the inner loop.
 		
-		When the inner loop finishes, the history table is merged into the pending table of the inner loop. So all of the the reads of arrays \texttt{x} and \texttt{M[i]} are put in the pending table of the inner loop. But in that pending table, \texttt{sum} is written to but not read. So it is killed, and so none of the reads or writes to \texttt{sum} will be put in the pending table. When line 11 is executed, this read also is not put in the pending table. 
-		So at the end of the first iteration, pending table will be
+		When the inner loop finishes, its history table is merged into the pending table of the outer loop. Meaning all of the the reads of arrays \texttt{x} and \texttt{M[i]} are put in the pending table of the outer loop. In that pending table, \texttt{sum} is written to but not read. Since the first access is a write, it is considered killed, and none of the reads or writes to \texttt{sum} will be put in the pending table. When line 11 is executed, this read of \texttt{sum} is also is not put in the pending table, as \texttt{sum} is still killed. 
+		
+		The first write to \texttt{sum} is still an important access that could cause a dependency in an outer loop, so it still needs to be stored. 
+		
+		At the end of the first iteration, the pending table will be
 			
 		\begin{tabular}{ |c|c|c| } 
 			\hline
-			\multicolumn{3}{|c|}{Pending Table (inner loop)} \\
+			\multicolumn{3}{|c|}{Pending Table (outer loop)} \\
 			\hline
 			Instr & Memory & R/W \\ 
 			\hline
-			2 & sum & W \\ 
-			4 & x[0-input-size] & R \\ 
-			5 & M[0][0-input-size] & R \\ 
-			12 & y[0] & W \\
+			2 & \texttt{sum} & W \\ 
+			4 & \texttt{x[0],...x[input-size-1]} & R \\ 
+			5 & \texttt{M[0][0],...,M[0][input-size-1]} & R \\ 
+			12 & \texttt{y[0]} & W \\
 			\hline
 		\end{tabular}
 	
-		Here x[0-input-size] is shorthand for separate entries for x[0], x[1],...,x[input-size - 1].
+		This table will be merged into the history table of the outer loop, and the process will repeat. Note that there will not be any read after write dependence logged, since \text{sum} and \texttt{y[i]} are only written to, and \texttt{x[j]} and \texttt{M[i][j]} are only read from. So the pairwise method concludes that the outer loop is parallel. 
+		Intuitively this is true, the outer loop can be parallelized trivially if the memory of \texttt{sum} if duplicated for each thread. 
+	
+		\subsection{Algorithm}
 		
-		This table will be merged into the history table of the outer loop, and the process will repeat. Note that there will not be any read after write dependence logged, since \text{sum} and \texttt{y[i]} are only written to, and \texttt{x[j]} and \texttt{M[i][[j]]} are only read from. So the pairwise method concludes that the outer loop is parallel. 
+		\begin{algorithm}[H]
+			\caption{Pairwise method}\label{basic-pariwise}
+			\begin{enumerate}
+				\item When Loop $L$ starts, initialize empty pending and history tables for $L$, and push $L$ onto the loop stack. 
+				
+				\item When a memory location $m$ is accessed by instruction $i$, when loop $L$ is at the top of the loop stack.
+					\begin{enumerate}
+						\item If location $m$ has a write but not a read in the pending table, do nothing. SUBTRACT-KILLED-SINGLE
+						\item Otherwise, put that information into the pending table. MERGE-SINGLE
+					\end{enumerate} 
+				
+				\item When an iteration of loop $L$ ends, 
+					\begin{enumerate}
+						\item Find conflicting memory locations between reads in the pending table, and writes in the history table. Report those conflicts. CONFLICT-CHECK
+						\item Merge pending table of into the history table. MERGE
+					\end{enumerate} 
+				
+				\item When loop $L$ terminates:
+					\begin{enumerate}
+						\item If there is an $L^\prime$ below $L$ on the loop stack:
+						\item Remove entries in history table of $L$ which are at killed memory locations of $L^\prime$'s memory location. SUBTRACT-KILLED
+						\item Merge history table of $L$ into pending table of $L^\prime$ MERGE
+						\item In any case, pop $L$ off the loops stack.
+					\end{enumerate} 
+				
+			\end{enumerate}
+		\end{algorithm}
 		
-		And intuitively this is true, the outer loop can be parallelized trivially if the memory of \texttt{sum} if duplicated for each thread. 
+		This 
 	
 	\section{Prior work on optimizing the pairwise method}
 		
-		Naive implementations of the pairwise method have severe time overhead that limit the usefulness of the method. This paper follows the tracks of the SD3 paper in reducing memory overhead through compression. This section gives an overview of the memory considerations involved with the pairwise method, and prior attempts to fix this by compressing the working memory. 
+		Naive implementations of the pairwise method have a severe memory overhead that limit the usefulness of the method. This paper follows the tracks of the SD$^3$ paper in reducing memory overhead through compression. This section gives an overview of the memory considerations involved with the pairwise method, and prior attempts to fix this by compressing the working memory. 
 		
 		\subsection{Memory overhead of pairwise method}
 		
-		The pairwise method often uses more working memory than ordinary systems have. The SD3 paper\footnote{\cite{text}} mentions commercial tools which take roughly 100x the time and 100x the memory of the program being profiled. The tested their implementation of the naive method on 17 SPEC 2006 C/C++ benchmarks. They found that 14 of them used more than 12gb of memory, and so could not be run on their system. Out of the 14 benchmarks that used over 12gb of memory to run, 9 used under 100mb memory under native execution, so memory overhead was over 120x for all 9 of these. 
-		
+		The pairwise method often uses more working memory than ordinary systems have. The SD$^3$ paper\footnote{\cite{Kim:2010}} mentions commercial tools which use roughly 100x the memory of the program being profiled. The authors tested their implementation of the naive method on 17 SPEC 2006 C/C++ benchmarks. They found that 14 applications used more than 12GB of memory, exceeding the limits of the test system. Out of the 14 benchmarks that used over 12GB of memory to run, 9 used under 100MB memory under native execution, and memory overhead was over 120x for all 9 of these. 
 		This suggests that ordinary users will not be able to profile important pieces of software on production inputs, limiting the usefulness of the tool.
-		
-		\subsection{Analysis of memory efficiency}
-		
-		The pairwise method is inefficient because it needs to store memory for every unique \texttt{(memory address, instruction, R/W)} tuple in every loop on the current stack of loops. An implementation using standard, unoptimized data structures might take 32 bytes or more to store each of these tuples. A history table storing all of the current working memory may then take at least 8 times the original working memory of the loop (assuming 4 byte word accesses). But perhaps substantially more, since the same memory address might be accessed by different instructions, or memory accesses might be smaller. Then consider that an nested loop may access most of the program's memory, so the history and pending tables of the outer loops will have to store all of this memory as well. 
-		
-		
-		\begin{tabular}{ |c|c|c| } 
-			\hline
-			\multicolumn{3}{|c|}{Sources of memory overhead} \\
-			\hline
-			Source & Estimated Overhead & Overhead Reasonable Range \\ 
-			\hline 
-			Storing tuples instead of memory & 8 & 4-32 \\ 	\hline
-			Multiple instruction access & 3 & 2-20 \\ \hline
-			Nested loops & 3 & 1-20 \\ \hline
-			\hline
-			Total & 72 & 8-1000 \\ \hline
-		\end{tabular}
-	
-		Note that SD3's actual studies showed substantially higher overhead than 72x in general, showing that some of these are underestimates. 
-		
-		\subsection{Time efficiency of a compression method}
-		
-		Any compression method should be fast as well as memory efficient. 
-		Ordinary compression methods, such as statistical file compression, have a inverse relationship between space and time. The better the compression ratio, the longer the computation. But this is not always the case. Sometimes, compression can make computations faster, since you operate over smaller datasets. Since the pairwise method is so slow to begin with, additional time overhead is undesirable. So ideally, a compressed implementation of the pairwise method would use the same or less time than the naive implementation. All compression methods suggested have this property. 
-		
+%		
+%		\subsection{Analysis of memory efficiency}
+%		
+%		The pairwise method is inefficient because it needs to store memory for every unique \texttt{(memory address, instruction, R/W)} tuple in every loop on the current stack of loops. An implementation using standard, unoptimized data structures might take 32 bytes or more to store each of these tuples. A history table storing all of the current working memory may then take at least 8 times the original working memory of the loop (assuming 4 byte word accesses). But perhaps substantially more, since the same memory address might be accessed by different instructions, or memory accesses might be smaller. Then consider that an nested loop may access most of the program's memory, so the history and pending tables of the outer loops will have to store all of this memory as well. 
+%		
+%		
+%		\begin{tabular}{ |c|c|c| } 
+%			\hline
+%			\multicolumn{3}{|c|}{Sources of memory overhead} \\
+%			\hline
+%			Source & Estimated Overhead & Overhead Reasonable Range \\ 
+%			\hline 
+%			Storing tuples instead of memory & 8 & 4-32 \\ 	\hline
+%			Multiple instruction access & 3 & 2-20 \\ \hline
+%			Nested loops & 3 & 1-20 \\ \hline
+%			\hline
+%			Total & 72 & 8-1000 \\ \hline
+%		\end{tabular}
+%	
+%		Note that SD3's actual studies showed substantially higher overhead than 72x in general, showing that some of these are underestimates. 
+%
+%		\subsection{Time efficiency of a compression method}
+%		
+%		Any compression method should be fast as well as memory efficient. 
+%		Ordinary compression methods, such as statistical file compression, have a inverse relationship between space and time. The better the compression ratio, the longer the computation. But this is not always the case. Sometimes, compression can make computations faster, since you operate over smaller datasets. Since the pairwise method is so slow to begin with, additional time overhead is undesirable. So ideally, a compressed implementation of the pairwise method would use the same or less time than the naive implementation. All compression methods suggested have this property. 
+%		
 		\subsection{Stride compression}
 		
 		The SD3 paper suggests compressing strides memory accesses.
