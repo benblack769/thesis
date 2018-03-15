@@ -443,12 +443,19 @@ for(int i = 1; i < n; i++){
 		
 		Lastly, loop level parallelism is easy to detect. The next section will give a simple algorithm to detect this. Other kinds of massive parallelism require more sophisticated analysis. 
 		
+		\section{Dynamic Analysis}
 		
+			There are two general methods to establish parallelism in code: static analysis and dynamic analysis. Static analysis tools parse code like compilers do, analyzing syntax trees of variable assignments and loops. They attempt to establish general properties of the code. Generally, the results of static analysis are true given any possible input. Unfortunately, as code increases in complexity and generality, it becomes impossible to derive precise results in full generality. For a complex semantic property like parallelism, static analysis returns too many false negatives to be useful for practical purposes. 
+			
+			Dynamic analysis tools examine running processes like an interpreter does, executing a series of instructions on a particular input, while analyzing the behavior and values of the running program. Since a dynamic analysis tool only observes the program on a particular input, it can only establish properties of the code for that specific input. Therefore, dynamic analysis can give false positives for parallelism, meaning a loop might be parallelizable on the particular input, but not on others. To reduce the number of false positives, a complex input that uses many of the features of the program and reflects production use will be more helpful than a simple, contrived input. 
+			
 		\subsection{Dynamic Loop Detection}
 		
-		Dynamic loop level parreleism detection requires a determination of when the loop start, ends, and iterates in a running program.
+		Dynamic loop level parallelism detection requires a determination of when a loop starts, ends, and iterates in a running program.
 		This is a surprisingly challenging problem. 
-		Loops have a clean structure in high level languages like C. It is easy for both the compiler and a human to understand what code is inside them, and when they start and end. However, this paper focuses on the dynamic analysis of loops. Doing dynamic analysis requires us to understand the structure of loops in machine code, as there is not always a precise mapping from machine code to source code. And loops in machine code are harder to detect, as they are implemented with "go to" instructions.
+		Loops have a clean structure in high level languages like C. It is easy for both the compiler and a human to understand what code is inside the body of a loop, and when the loop starts and ends. However, this work focuses on the dynamic analysis of loops. 
+		
+		Doing dynamic analysis requires us to understand the structure of loops in machine code. Even if the source code is available, there is not always a precise mapping from machine code to source code, as loops may be compiled to different machine code in different ways depending on the compiler. Loops in machine code are hard to detect, as they are implemented with "go to" instructions. "go to" instructions allow the code to jump to fixed instructions elsewhere in the code. "go to" instructions implement various functionality like if-else blocks, while loops, and break statements, so their presence does not guarantee a loop.
 		
 		To demonstrate the difficulty of finding loops in machine code, here is the standard way of translating the above vector-scalar multiply loop into machine code:
 		
@@ -471,7 +478,7 @@ goto line 2
 ...
 		\end{lstlisting}
 		
-		Note that the loop starts on line 2, which is a bit tricky to see. 
+		The loop starts on line 2, which is a bit tricky to see. 
 		
 		Note that even with a single simple loop, there two gotos. With nested loops, branches, and break statements, it quickly becomes very difficult to understand where the loop starts, and how to know that the loop terminated.
 		So in order to understand loops in machine code, we have to somehow separate loops out from a tangle of "go to" instructions. 
@@ -693,7 +700,9 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 		This table will be merged into the history table of the outer loop, and the process will repeat. Note that there will not be any read after write dependence logged, since \text{sum} and \texttt{y[i]} are only written to, and \texttt{x[j]} and \texttt{M[i][j]} are only read from. So the pairwise method concludes that the outer loop is parallel. 
 		Intuitively this is true, the outer loop can be parallelized trivially if the memory of \texttt{sum} if duplicated for each thread. 
 	
-		\subsection{Algorithm}
+		\subsection{Generalized algorithm}
+		
+		To generalize to arbitrary nested loops, the pairwise method keeps a stack of pending and history tables for all of the active loops. With this, we can describe a more precise algorithm for the pairwise method. 
 		
 		\begin{algorithm}[H]
 			\caption{Pairwise method}\label{basic-pariwise}
@@ -702,8 +711,8 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 				
 				\item When a memory location $m$ is accessed by instruction $i$, when loop $L$ is at the top of the loop stack.
 					\begin{enumerate}
-						\item If location $m$ has a write but not a read in the pending table, do nothing. SUBTRACT-KILLED-SINGLE
-						\item Otherwise, put that information into the pending table. MERGE-SINGLE
+						\item If location $m$ is killed in the pending table, do nothing. SUBTRACT-KILLED
+						\item Otherwise, put that information into the pending table. ADD-ACCESS
 					\end{enumerate} 
 				
 				\item When an iteration of loop $L$ ends, 
@@ -722,17 +731,32 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 				
 			\end{enumerate}
 		\end{algorithm}
-		
-		This 
 	
+		An implementation of the pairwise method simply needs to define the data structures of the pending and history table, and make the capitalized procedures more precise. 
+	
+		\subsection{Naive implementation}
+		
+		One natural implementation of the pairwise method goes like this:
+		
+		The pending and history tables are a hash table indexed by memory address, which holds sets of instructions. The tables for writes and reads are separated, so there are two pending tables, one for reads, and one for writes. Then the table procedures outlined in the pairwise algorithm description are implemented as follows:
+		
+		\begin{itemize}
+			\item SUBTRACT-KILLED: Check if there is an entry at that location in the write pending table but not the read pending table.
+			\item ADD-ACCESS: Get the read pending table if the access is a read, otherwise, get the write table. If there is no entry at the memory address of that table, add an entry, and put the instruction in the list. If there is an entry, add the accessed instruction to the set. 
+			\item MERGE: Repeatedly add every access from the input table to the output table using ADD-ACCESS. 
+			\item CONFLICT-CHECK: Go through every entry in the pending table, and check if it is a read, and that there is a corresponding entry in the 
+		\end{itemize}
+		
+		
+		
 	\section{Prior work on optimizing the pairwise method}
 		
-		Naive implementations of the pairwise method have a severe memory overhead that limit the usefulness of the method. This paper follows the tracks of the SD$^3$ paper in reducing memory overhead through compression. This section gives an overview of the memory considerations involved with the pairwise method, and prior attempts to fix this by compressing the working memory. 
+		Naive implementations of the pairwise method have a severe memory overhead that limits the usefulness of the approach. Kim et al.'s work mitigates this problem by reducing memory consumption through compression. Our work follows the mechanism used in the SD$^3$ paper to reduce memory overhead. This section gives an overview of the memory considerations involved with the pairwise method and prior attempts to fix this by compressing the working memory. 
 		
 		\subsection{Memory overhead of pairwise method}
 		
-		The pairwise method often uses more working memory than ordinary systems have. The SD$^3$ paper\footnote{\cite{Kim:2010}} mentions commercial tools which use roughly 100x the memory of the program being profiled. The authors tested their implementation of the naive method on 17 SPEC 2006 C/C++ benchmarks. They found that 14 applications used more than 12GB of memory, exceeding the limits of the test system. Out of the 14 benchmarks that used over 12GB of memory to run, 9 used under 100MB memory under native execution, and memory overhead was over 120x for all 9 of these. 
-		This suggests that ordinary users will not be able to profile important pieces of software on production inputs, limiting the usefulness of the tool.
+		The pairwise method often uses more working memory than ordinary systems have, since it has to store information for each memory access in the worst case. The SD$^3$ paper\footnote{\cite{Kim:2010}} mentions commercial tools which use roughly 100x the memory of the program being profiled. The authors tested their implementation of the naive method on 17 SPEC 2006 C/C++ benchmarks. They found that 14 applications used more than 12GB of memory, exceeding the limits of the test system. Out of the 14 benchmarks that used over 12GB of memory to run, 9 used under 100MB of memory under native execution, and memory overhead was over 120x for all 9 of these applications. 
+		This suggests that ordinary users will not be able to profile important pieces of software on production inputs, limiting the usefulness of tools using the naive pairwise method.
 %		
 %		\subsection{Analysis of memory efficiency}
 %		
@@ -758,16 +782,19 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 %		
 %		Any compression method should be fast as well as memory efficient. 
 %		Ordinary compression methods, such as statistical file compression, have a inverse relationship between space and time. The better the compression ratio, the longer the computation. But this is not always the case. Sometimes, compression can make computations faster, since you operate over smaller datasets. Since the pairwise method is so slow to begin with, additional time overhead is undesirable. So ideally, a compressed implementation of the pairwise method would use the same or less time than the naive implementation. All compression methods suggested have this property. 
-%		
+%
 		\subsection{Stride compression}
 		
-		The SD3 paper suggests compressing strides memory accesses.
+		The SD$^3$ paper introduces using strides to compress the memory accesses information in the pending and history tables. We present SD$^3$ approach here as the thesis uses a similar approach. 
+		%The SD$^3$ paper suggests compressing strided memory accesses. 
+		%Strided memory accesses are very common in code.
 		
 		\subsubsection{What is a stride?}
 		
-		A stride is a range of locations which have a constant interval between elements. You can store it as a triple \texttt{(first, last, interval)}.
+		A stride is a finite range of integers which have a constant interval between elements. It can be stored efficiently as a triple \texttt{(first, last, interval)}. For example, the even numbers from 2 to 20 would be a stride \texttt{(first: 2, last: 20, interval: 2)}.
 		
-		For example, here is code that accesses an array of memory in a stride pattern. 
+		Memory is often accessed in a strided fashion in code.
+		For example, here is code that accesses an array of memory in a strided fashion. Every third element of the array is written to. 
 		
 		\begin{lstlisting}
 for(int i = 1; i < 12; += 3){
@@ -775,24 +802,86 @@ for(int i = 1; i < 12; += 3){
 }
 		\end{lstlisting}
 		
-		Assuming all elements of the array were set to 0, the resulting array would look like this.
+%		Assuming all elements of the array were set to 0, the resulting array would look like this.
+%		
+%		\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c|c|c| } 
+%			\hline
+%			B[0] & B[1] & B[2] & B[3] & B[4] & B[5] & B[6] & B[7] & B[8] & B[9] & B[10] & B[11] \\
+%			\hline
+%			0 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 0 & 0 & 1 &  0 \\
+%			\hline
+%		\end{tabular}
+		One way to store all these memory accesses would be to store a list of memory addresses for each index \texttt{[1, 4, 7, 10]}.
+		But information can be stored more efficiently as a stride: \texttt{(first:1, last:10, interval:3)}. This is more efficient because no matter how long the stride is, it can always be stored in just 3 values, instead of needing more memory to store each new access. 
 		
-		\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c|c|c|c| } 
-			\hline
-			B[0] & B[1] & B[2] & B[3] & B[4] & B[5] & B[6] & B[7] & B[9] & B[9] & B[10] & B[11] & B[12] \\
-			\hline
-			0 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 0 & 0 \\
-			\hline
-		\end{tabular}
+		%\subsection{Components of the SD$^3$ compressed pairwise method}
 		
-		To track all of these memory accesses, the naive version would store list of values: \texttt{(1, 4, 7, 10)}. But this can be stored as a stride as well: \texttt{(first:1, last:10, interval:3)}. Note that 
+		\subsubsection{Detecting strides}
 		
-		\subsubsection{Stride compression of the pairwise method}
+		The SD$^3$ method detects both the existence and interval of strided accesses. 
+		Some access patterns are not strided, and if so, the memory accesses should not be treated as strides. When access are strided, then the interval of the stride must be calculated.  
+		
+		SD$^3$ suggests using an online stride detection algorithm to calculate both existence and length of strides.
+		This algorithm keeps a global data structure separate from the loop stack which keeps track of separate state machines for every instruction. The state machine is organized as follows:
+		
+		\includegraphics[scale=0.6]{stride-detector}
+		
+		This state machine keeps track of the stride length and position of previous accesses, inferring the stride length of the current access. The strong stride-weak stride states allow for short interruptions in the stride pattern. 
+		
+		\subsubsection{Data structure for non-strided accesses}
+		
+		Some memory access patterns are not strides. When this is the case, the SD$^3$ method calls these these accesses "points", and puts them in a "point table", which is similar in structure to the pending and history tables in the naive method. These are kept seperate from the strides, which are put in the "stride table". There is both a stride and a point table inside each history and each pending table. 
+		
+		\subsubsection{Data structure for strided accesses}
+		
+		Operations on non-strided accesses are efficient because the memory location of an access can be looked up quickly using hash tables. However, strides can conflict and be merged even when they don't start or end on the same address, so different data structures are needed. The SD$^3$ suggests use of interval trees. 
+		
+		An interval tree is an augmented binary search tree that stores intervals, instead of single values. An interval tree can efficiently find all intervals stored inside it which overlap with another interval. 
+		
+		Take the following tree below (WIKIPEDIA: \url{https://en.wikipedia.org/wiki/File:Example_of_augmented_tree_with_low_value_as_the_key_and_maximum_high_as_extra_annotation.png}), which stores 5 intervals, including \texttt{[20,30)}, \texttt{[10,15)}, and \texttt{[0,1)}. 
+		
+		\includegraphics[scale=0.5]{interval-tree}
+		
+		This tree can be queried to find all intervals that overlap with another one, say \texttt{[40,50)} (this will return \texttt{[3,41)}, and \texttt{[29,99)}). Like a ordinary binary search tree, it is self-balancing and allows $O(\log(n))$ inserts and deletes, and finds are $O(m\log(n))$, where $m$ is the number of intervals it finds. 
+		
+		\subsubsection{Merging strides}
+		
+		Strides are detected in an online algorithm that outputs a singleton strides for each memory access. So they are not yet compressed. In order to compress these short strides to arbitrary length strides, they must be merged together when tables are folded together in MERGE. Strides can be merged if another stride can be created only by extending the bounds of the stride. For example,  \texttt{(first:1, last:10, interval:3)} and  \texttt{(first:13, last:22, interval:3)} can be merged, since the stride  \texttt{(first:1, last:22, interval:3)} covers the same elements as the two of them combined.
+		
+		SD$^3$ finds mergable strides by using interval trees. 
+		
+		\subsubsection{Finding overlap between sets of strides}
+		
+		To calculate conflicts in CONFLICT-CHECK, the strides that have overlapping ranges must be found efficiently. SD$^3$ uses interval trees to find the sets of strides in the one table which have ranges that overlap with the strides in another table. The interval trees are also used to find conflicts between the non-stride points and strides. 
+		
+		\subsubsection{Finding conflicts between overlapping strides}
+		
+		Once strides that have overlapping ranges are found, it is still left to be determined whether they actually access the same bytes of memory. SD$^3$ introduces a new algorithm called Dynamic-GCD, which efficiently finds overlap between strides.
+		
+\chapter{Implementation}
+	\section{Introduction to workload characterization}
+	
+		Workload characterization is the study of how applications use hardware features. 
+		Traditionally, hardware researchers are interested in what sorts of hardware characteristics are important in improving application performance. They use workload characterization to understand how tradeoffs in hardware design would affect various applications’ performance. To accomplish this, they collect metrics about the applications that are important to the sorts of computations they want to optimize and the sorts of hardware tradeoffs they are considering making. 
+		
+		We are interested in a related, but quite different question. We are interested about the sorts of application characteristics that can help the programmer understand choices between different established hardware platforms. We are using workload characterization in order to understand what sorts of characteristics of single threaded CPU programs are indicators of performance on completely different platforms. 
+		
+		%They assemble a set of applications that reflect the sorts of computations they want to focus on, and thMetrics that reflect the tradeoffs under consideration are assembled, and 
 		
 		
-		\subsection{Bit compression}
 		
+	\section{Experimental setup}
+	
 		
+	
+	\section{Implementation}
+	
+		
+	
+\chapter{chpt2}
+		%\subsection{Bit compression}
+		
+		%Another possible compression method is by using a 
 		
 			
 	\section{Motivation}
