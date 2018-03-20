@@ -457,7 +457,7 @@ for(int i = 1; i < n; i++){
 		This is a surprisingly challenging problem. 
 		Loops have a clean structure in high level languages like C. It is easy for both the compiler and a human to understand what code is inside the body of a loop, and when the loop starts and ends. However, this work focuses on the dynamic analysis of loops. 
 		
-		Doing dynamic analysis requires us to understand the structure of loops in machine code. Even if the source code is available, there is not always a precise mapping from machine code to source code, as loops may be compiled to different machine code in different ways depending on the compiler. Loops in machine code are hard to detect, as they are implemented with "go to" instructions. "go to" instructions allow the code to jump to fixed instructions elsewhere in the code. "go to" instructions implement various functionality like if-else blocks, while loops, and break statements, so their presence does not guarantee a loop.
+		Doing dynamic analysis requires us to understand the structure of loops in machine code. Even if the source code is available, there is not always a precise mapping from machine code to source code, as loops may be compiled to different machine code depending on the compiler. Loops in machine code are hard to detect, as they are implemented with "go to" instructions (referenced in this paper as goto). goto instructions allow the code to jump to fixed instructions elsewhere in the code. These instructions implement various functionality like if-else blocks, while loops, and break statements, so their presence does not guarantee a loop.
 		
 		To demonstrate the difficulty of finding loops in machine code, here is the standard way of translating the above vector-scalar multiply loop into machine code:
 		
@@ -478,29 +478,28 @@ B[i] = tmp1
 i = i + 1
 goto line 2
 ...
-		\end{lstlisting}
+		\end{lstlisting} 
 		
-		The loop starts on line 2, which is a bit tricky to see. 
+		Note that even with a single simple loop, there are two goto statements, one for creating the loop, and one for exiting the loop. With nested loops, branches, and break statements, it quickly becomes very difficult to understand where a particular loop starts and how to know that a particular loop terminated.
+		So in order to understand loops in machine code, we have to somehow separate loops out from a tangle of goto instructions. 
 		
-		Note that even with a single simple loop, there two gotos. With nested loops, branches, and break statements, it quickly becomes very difficult to understand where the loop starts, and how to know that the loop terminated.
-		So in order to understand loops in machine code, we have to somehow separate loops out from a tangle of "go to" instructions. 
+		Luckily, there is prior work for doing just this. We use LoopProf \footnote{\cite{Chen:2004}} code in order to detect the locations of loops in code. In particular, LoopProf tells us where the loop begins and the nesting structure of loops. 
 		
-		Luckily, there is prior work for doing just this. We use LoopProf \footnote{\cite{Chen:2004}} code in order to detect locations of loops in code. In particular, LoopProf tells us where the loop begins, and the nesting structure of the loops. 
+		LoopProf uses dynamic analysis in order to determine where loops are. At a high level, it tracks a list of instructions executed in a function. When a goto jumps back to a instruction on that list, then LoopProf concludes that there was a loop, and that its second iteration just started executing. 
 		
-		LoopProf also uses dynamic analysis in order to determine where the loops are. At a high level, it tracks a list of instructions executed in a function. When that list folds back on itself, LoopProf concludes that there was a loop, and the second iteration just started. 
-		
-		However, the LoopProf implementation did not contain all of the functionality we needed. In particular, it did not detect precise ends of loops, which we needed for dynamic dependence analysis. So we made some alterations in order to deal with this problem. Unfortunately, these are technical enough and far enough away from the point of this chapter, that we will not get into more detail about this. 
+		However, the LoopProf implementation, generously provided to us by its author, did not contain all of the functionality we needed. In particular, it did not detect the precise ends of loops, which we needed for dynamic dependence analysis. Consequently, we made some additions in order to suit our needs. 
+		%Unfortunately, these are technical enough and far enough away from the point of this chapter, that we will not get into more detail about this. 
 		
 	\section{The baseline algorithm: The pairwise method}
 	
 		One of the goals of this thesis is to create a tool that identifies loop level parallelism. The literature has several methods to identify this type of parallelism. A particularly simple method is the naive pairwise method. This thesis's implementation will be an optimization of the pairwise method, so the naive version will be described in detail here. 
 		
 		Recall that loop level parallelism occurs when each iteration of a loop can be executed independently from every other iteration, and that independence means that one iteration does not depend on data computed by another iteration. 
-		The pairwise method tracks reads and writes to memory to determine dependences. Each read is considered to be an input to the computation in the loop, and each write is an output. If one loop iteration writes to one location in memory and a later one reads from that same location, then that is a dependence that should be recorded as it inhibits parallelism. 
+		The pairwise method tracks reads and writes to memory to determine dependences. Each read is considered to be an input to the computation in the loop, and each write is an output. If one loop iteration writes to one location in memory and a later iteration reads from that same location, then that is a dependence that should be recorded as it inhibits parallelism. 
 		
-		There is an important difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, consider a location in memory that is written to before it is read in a loop iteration. Then the data that was previously at that location was overwritten, so the current iteration will not depend on data at that location. In this case, we say the location is "killed." Reads of killed memory locations are not tracked in that iteration.
+		There is an important difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, consider a location in memory that is written to before it is read in a loop iteration. The data that was previously at that location was overwritten, so the current iteration will not depend on data at that location that was written to in previous iterations. In this case, we say the location is "killed." Reads of killed memory locations are not tracked in a given iteration.
 		
-		The pairwise method stores 2 different structures for a particular loop. 
+		The pairwise method stores two different structures for a particular loop:
 		
 		\begin{itemize}
 			\item history table: A table of reads and writes of previous loop iterations.
@@ -521,13 +520,13 @@ goto line 2
 		Here is the cumulative sum procedure from the loop level parallelism example section, written to show only the reads and writes to memory.
 			\begin{lstlisting}
 for(int i = 1; i < n; i++){
-	tmp1 = B[i-1]		\\READ B[i-1]
-	tmp2 = A[i] 		\\READ A[i]
-	B[i] = tmp1 * tmp2	\\WRITE B[i]
+	tmp1 = B[i-1]		//READ B[i-1]
+	tmp2 = A[i] 		//READ A[i]
+	B[i] = tmp1 * tmp2	//WRITE B[i]
 }
 			\end{lstlisting}
 		
-		When the loop is executed, the code reads and writes to the arrays. This read and write information is combined with information about how the loop iterates. For example, here is how the above code would be processed when executed. 
+		When the loop is executed, the code reads and writes to the arrays. This read and write information is combined with information about how the loop iterates in our analysis. For example, here is how the above code would be processed when executed. 
 		
 		\begin{lstlisting}
 LOOP START
@@ -543,10 +542,10 @@ LOOP ITERATION
 LOOP END
 		\end{lstlisting}
 		
-		This combined information is the input to the pairwise method. Note that in the implementation, lines will be notated by their instruction address, not the line number. 
+		This combined information is the input to the pairwise method. Note that in the implementation, lines will be notated by their instruction addresses, not their line numbers. 
 		
 		The actual process of the pairwise method can be seen in the tables below.
-		When the loop starts, the pending table and history table are empty. As the first iteration is processed, reads and writes are put into the pending table. Right before the first iteration ends, the pending table looks like this:
+		When the loop starts, the pending table and history table are empty. As the first iteration is processed, reads and writes are put into the pending table. Right before the first iteration ends, the pending and history tables looks like this:
 		
 		
 		\begin{minipage}{1.0\linewidth}
@@ -637,12 +636,12 @@ LOOP END
 		\end{minipage}%
 		\end{minipage}%
 	
-		At the end of the second iteration, the pairwise method will look through the reads of the pending table, and see if there are any memory addresses in the history table that are writes. In this case, the history table has a write at address B[1] by line 4, and the pending table has a read at B[1] by line 2. So a dependence between line 4 and 2 will be logged, avnd  the pairwise method correctly identifies that the loop is not parallel. 
+		At the end of the second iteration, the pairwise method will look through the reads of the pending table and see if there are any memory addresses in the history table that are writes. In this case, the history table has a write at address B[1] by line 4, and the pending table has a read at B[1] by line 2. A dependence between line 4 and 2 will be logged, and  the pairwise method correctly identifies that the loop is not parallel. 
 		
 		\subsection{Nested loop demonstration}
 		
 		This method also works for nested loops.  
-		In this vector-matrix multiplication procedure, presented here, the inner loop is not parallel but the outer loop is. The pairwise method will be able to detect this. 
+		In the vector-matrix multiplication procedure presented here, the inner loop is not parallel but the outer loop is. The pairwise method will be able to detect this. 
 		
 		\begin{codeexample}
 			\caption{Matrix-vector multiply}\label{vec-mat-mul}
@@ -861,7 +860,7 @@ for(int i = 1; i < 12; += 3){
 		During CONFLICT-CHECK, there are 3 different types of possible access conflicts: point-point, point-stride, and stride-stride. Point-point conflicts are found exactly as in the naive version, with hash table lookups. Possible point-stride and stride-stride conflicts are found using interval trees. Checking point-stride conflicts efficiently is simple, but checking stride-stride conflicts in constant time is more complex. 
 		
 		SD$^3$ introduces a new algorithm called Dynamic-GCD which efficiently finds overlap between strides. 
-		To under how constant time stride overlap checking is possible, consider infinite length strides. With infinite length strides, 
+		To under how constant time stride overlap checking is possible, consider infinite length strides. Take two infinite length strides, with stride length $a$ and $b$. Take two points, one from each stride, and calculate the distance between them. Call this distance $c$. Then there is an integer $x$ and $y$ such that $ax + by = c$ iff the strides conflict. This condition is in turn equivalent to $c = 0 \mod (\gcd(a,b))$, where $\gcd(a,b)$ is the greatest common denominator of $a$ and $b$. This test can be done in constant time with the well known Euclidean algorithm for the GCD. Now, finite strides sometimes do not intersect when their infinite counterparts do, so the Dynamic-GCD algorithm gives a similar, but more complex test than the above that uses the Extended Euclidean algorithm to exactly compute intersection for finite strides. 
 		
 	\section{Bit compression}
 	
