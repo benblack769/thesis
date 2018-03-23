@@ -920,23 +920,47 @@ for(int i = 1; i < 12; += 3){
 		
 	\section{Stride Compression Implementation}
 	
-		The code that Kim et al. wrote to implement the SD$^3$ algorithm was sponsored by Intel, so it is closed source, and we cannot use it to detect parreleism. As we still need to detect parreleism without running out of system memory, we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity, and then had to make further changes to improve efficiency. 
+		The code that Kim et al. wrote to implement the SD$^3$ algorithm was sponsored by Intel, so it is closed source, and we cannot use it to detect parallelism. To achieve the goals of this paper, we still needed to detect parallelism without running out of system memory, so we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity. In particular, we could not find a good pre-made interval tree, and making a new one from scratch seemed difficult, slow, and bug-prone. In addition, the the details of the Dynamic-GCD algorithm proved difficult to work out. As these were key features to ensure efficiency, more changed had to be made to improve efficiency. In particular, a slow conflict-check method is introduced so that merging strides can be faster and better. 
 		
-		\subsection{Global read/write sets}
 		
-		In the SD$^3$ method, all 
 		
-		\subsubsection{Simple SUBTRACT-KILLED implementation}
-		\subsubsection{Optimizing CONFLICT-CHECK for parallel loops}
+		\subsection{Data structures}
 		
-		\subsection{Global read/write sets}
-		\subsection{Different stride/point data structure}
-		\subsection{MERGE algorithm}
-		\subsection{CONFLICT-CHECK algorithm}
+			Point and stride data structures are optimized for efficient merging. 
+			
+			\includegraphics[scale=0.8]{data_diagram.pdf}
+			
+			hithere
+			
+			\includegraphics[scale=0.8]{conflict-diagram.pdf}
+			
+			hithere
+			
+			
 		
-		\subsubsection{Efficiency for large loops}
-		\subsection{Finding overlapping strides efficiently}
-		\subsection{Checking for intersection on overlapping strides}
+			%Instead of using interval trees, we used data structures optimized towards merging strides and points. Points can only be merged if their instruction and memory address is the same, so they are stored by instruction and memory address. 
+		
+		%\subsection{MERGE algorithm}
+			
+			
+			
+%		\subsection{CONFLICT-CHECK algorithm}
+%		
+%			Efficiency for CONFLICT-CHECK is n
+%		
+%		\subsection{Global read/write bit sets}
+%		
+%		The pairwise method is difficult to optimize since memory addresses needs to be paired with the code instruction that accessed it. But some operations are only concerned with total memory accesses, and do not need the associated instruction. %this requirement were not there, then one can simply used bit compressed sets, as described in section 1.6.
+%		
+%		%In the SD$^3$ method, all read and write information is stored in points and strides. 
+%		
+%		\subsubsection{Simple SUBTRACT-KILLED implementation}
+%		\subsubsection{Optimizing CONFLICT-CHECK for parallel loops}
+%		
+%		
+%		\subsubsection{Efficiency for large loops}
+%		\subsection{Finding overlapping strides efficiently}
+%		\subsection{Checking for intersection on overlapping strides}
 		
 	\section{Bit Compression Implementation}
 	
