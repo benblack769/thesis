@@ -39,7 +39,7 @@
 \usepackage{natbib}
 \usepackage{listings}
 \usepackage{tikz}
-\usepackage[table]{xcolor}
+\usepackage{xcolor,colortbl}
 \usepackage{float}
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
@@ -958,10 +958,18 @@ for(int i = 1; i < 12; += 3){
 		
 			The data structures allow for very simple merge operations. The bit set is merged by an in-place union operation. For the point and stride tables, the operation simply calls \texttt{extract} to collect all the elements from the source table, and adds them one at a time to the destination table. 
 			
-			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. For strides it is somewhat more complex, since strides need to be merged. But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride length, the strides would be the same if they were infinite length. Referring back to Figure \ref{stridepointfig}, these are exactly the strides which have the same value in the outer set. 
+			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. For strides it is somewhat more complex, since strides need to be merged. But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride length, the strides would be the same if they were infinite length. Referring back to Figure \ref{stridepointfig}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
 			Then the inner binary search tree is used to check if the strides are close enough to actually merge. 
 			
+			\newcommand{\blackcell}{\cellcolor{black!50}}
+			\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c } 
+				\hline
+				Current strides & \blackcell & \blackcell \\ 
+				\hline
+				Added strides & \blackcell & \blackcell \\ 
+				\hline
+			\end{tabular}
 			
 %			\begin{algorithm}
 %				\caption{MassiveParrelelSum}\label{parellelsum}
@@ -986,9 +994,40 @@ for(int i = 1; i < 12; += 3){
 %			
 		\subsection{Conflict Check}
 
+			In SD$^3$, there is a single procedure that evaluates the information about memory conflicts. We broke CONFLICT-CHECK into two procedures for performance reasons. The first procedure, IsParallel, is a fast operation that simply checks the intersection of the bit sets of the reads of the pending table and the writes of the history table. It gives a binary answer, either the loop is parallel, or not. The second operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory by looking at points and strides, and is much slower. The diagram below shows the general outline of these operations. 
 			
 			\includegraphics[scale=0.8]{conflict-diagram.pdf}
 			
+			
+			\begin{algorithm}
+				\caption{CONFLICT-CHECK}\label{conflict-check}
+				\begin{algorithmic}[1]
+					%\Function{RecursiveSum}{A,s,e}
+					\If {$\textsc{IsParallel}$}
+					\State Report parallel iteration 
+					\State \Return
+					\EndIf
+					\If {$\textsc{NumConflitingIters} < \textsc{TRUNCATE_ITER_NUM}$}
+					\State Report conflicting iteration 
+					\State \Return 
+					\EndIf
+					%\EndIf
+					%\State
+					%\State Report conflicting iteration 
+					%\State \Return 
+%					\State $m \gets \floor{e-s}$
+%					\State $s_1 \gets \textsc{RecursiveSum}(A,s,m)$
+%					\State $s_2 \gets \textsc{RecursiveSum}(A,m,e)$
+%					\State \Return $s_1+s_2$
+%					\EndFunction
+%					\Function{StandardSum}{A}
+%					\State $s \gets 0$
+%					\For{$a \in A$}
+%					\State $s \gets s + a$
+%					\EndFor
+%					\EndFunction
+				\end{algorithmic}
+			\end{algorithm}
 			
 			\subsubsection{Find Overlapping}
 			\subsubsection{Filter Conflicting}
