@@ -39,6 +39,7 @@
 \usepackage{natbib}
 \usepackage{listings}
 \usepackage{tikz}
+\usepackage[table]{xcolor}
 \usepackage{float}
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
@@ -920,23 +921,77 @@ for(int i = 1; i < 12; += 3){
 		
 	\section{Stride Compression Implementation}
 	
-		The code that Kim et al. wrote to implement the SD$^3$ algorithm was sponsored by Intel, so it is closed source, and we cannot use it to detect parallelism. To achieve the goals of this paper, we still needed to detect parallelism without running out of system memory, so we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity. In particular, we could not find a good pre-made interval tree, and making a new one from scratch seemed difficult, slow, and bug-prone. In addition, the the details of the Dynamic-GCD algorithm proved difficult to work out. As these were key features to ensure efficiency, more changed had to be made to improve efficiency. In particular, a slow conflict-check method is introduced so that merging strides can be faster and better. 
-		
-		
+		The code that Kim et al. wrote to implement the SD$^3$ algorithm was sponsored by Intel, so it is closed source, and we cannot use it to detect parallelism. To achieve the goals of this paper, we still needed to detect parallelism without running out of system memory, so we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity. In particular, we could not find a good pre-made interval tree, and making a new one from scratch seemed difficult, slow, and bug-prone. In addition, the the details of the Dynamic-GCD algorithm proved difficult to work out. As these were key features to ensure efficiency, more changed had to be made to improve efficiency. In particular, a slow conflict-check method is used, so optimizations are introduced that minimize the number of conflict-check operations that can occur. 
 		
 		\subsection{Data structures}
 		
-			Point and stride data structures are optimized for efficient merging. 
+			The data structures which implement point and stride tables are optimized for efficient merging, instead of efficient conflict checking. They have two methods, an "add" method, which simply adds an item to the table, and an extract method, which gets all current items in the table.
 			
-			\includegraphics[scale=0.8]{data_diagram.pdf}
 			
-			hithere
+			%\caption{Data structures}
+			\begin{figure}
+				\label{stridepointfig}
+				\caption{text}
+				\begin{minipage}{1.0\linewidth}
+					\begin{minipage}[u]{.5\linewidth}
+						\includegraphics[scale=0.8]{stride_data.pdf}
+					\end{minipage}%
+					\begin{minipage}[u]{.5\linewidth}
+						\includegraphics[scale=0.8]{point_data.pdf}
+					\end{minipage}
+				\end{minipage}
+			\end{figure}
+		
+			Points and strides store which instruction accessed them. But some operations do not need that data, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set:
+			
+			\includegraphics[scale=0.8]{bit_data.pdf}
+				
+				
+			%\end{figure}
+			
+			We decided to create separate tables for reads and writes. So in a pending table, there is a 
+			
+			The LoopInstance object, which keeps track of all information for a loop, has separate tables for reads and writes
+			
+			\includegraphics[scale=0.8]{LoopData.pdf}
+		\subsection{Merge}
+		
+			The data structures allow for very simple merge operations. The bit set is merged by an in-place union operation. For the point and stride tables, the operation simply calls \texttt{extract} to collect all the elements from the source table, and adds them one at a time to the destination table. 
+			
+			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. For strides it is somewhat more complex, since strides need to be merged. But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride length, the strides would be the same if they were infinite length. Referring back to Figure \ref{stridepointfig}, these are exactly the strides which have the same value in the outer set. 
+			
+			Then the inner binary search tree is used to check if the strides are close enough to actually merge. 
+			
+			
+%			\begin{algorithm}
+%				\caption{MassiveParrelelSum}\label{parellelsum}
+%				\begin{algorithmic}[1]
+%					\Function{RecursiveSum}{A,s,e}
+%					\If {$e - s \le 2$}
+%					\Return {$\textsc{StandardSum}(A[s:e])$}
+%					\EndIf
+%					\State $m \gets \floor{e-s}$
+%					\State $s_1 \gets \textsc{RecursiveSum}(A,s,m)$
+%					\State $s_2 \gets \textsc{RecursiveSum}(A,m,e)$
+%					\State \Return $s_1+s_2$
+%					\EndFunction
+%					\Function{StandardSum}{A}
+%					\State $s \gets 0$
+%					\For{$a \in A$}
+%					\State $s \gets s + a$
+%					\EndFor
+%					\EndFunction
+%				\end{algorithmic}
+%			\end{algorithm}
+%			
+		\subsection{Conflict Check}
+
 			
 			\includegraphics[scale=0.8]{conflict-diagram.pdf}
 			
-			hithere
 			
-			
+			\subsubsection{Find Overlapping}
+			\subsubsection{Filter Conflicting}
 		
 			%Instead of using interval trees, we used data structures optimized towards merging strides and points. Points can only be merged if their instruction and memory address is the same, so they are stored by instruction and memory address. 
 		
