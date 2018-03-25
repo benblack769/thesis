@@ -785,7 +785,7 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 %		Any compression method should be fast as well as memory efficient. 
 %		Ordinary compression methods, such as statistical file compression, have a inverse relationship between space and time. The better the compression ratio, the longer the computation. But this is not always the case. Sometimes, compression can make computations faster, since you operate over smaller datasets. Since the pairwise method is so slow to begin with, additional time overhead is undesirable. So ideally, a compressed implementation of the pairwise method would use the same or less time than the naive implementation. All compression methods suggested have this property. 
 %
-		\subsection{Stride compression}
+		\subsection{Stride compression}\label{sse:stride-descr}
 		
 		The SD$^3$ paper introduces using strides to compress the memory accesses information in the pending and history tables. We present SD$^3$ approach here as the thesis uses a similar approach. 
 		%The SD$^3$ paper suggests compressing strided memory accesses. 
@@ -921,17 +921,74 @@ for(int i = 1; i < 12; += 3){
 		
 	\section{Stride Compression Implementation}
 	
-		The code that Kim et al. wrote to implement the SD$^3$ algorithm was sponsored by Intel, so it is closed source, and we cannot use it to detect parallelism. To achieve the goals of this paper, we still needed to detect parallelism without running out of system memory, so we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity. In particular, we could not find a good pre-made interval tree, and making a new one from scratch seemed difficult, slow, and bug-prone. In addition, the the details of the Dynamic-GCD algorithm proved difficult to work out. As these were key features to ensure efficiency, more changed had to be made to improve efficiency. In particular, a slow conflict-check method is used, so optimizations are introduced that minimize the number of conflict-check operations that can occur. 
+		The code that Kim et al. wrote to implement the SD$^3$ algorithm was sponsored by Intel, so it is closed source, and we cannot use it to detect parallelism. To achieve the goals of this paper, we still needed to detect parallelism without running out of system memory, so we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity. In particular, interval trees are bug-prone to implement ourselves, and we could not find an open source c++ implementation, so we chose to use other data structures. 
+		In addition, the the details of the Dynamic-GCD algorithm proved difficult to work out, so we used other techniques for finding stride conflicts.
+		 These were key features to ensure efficiency, more changes had to be made to improve efficiency. In particular, a slow conflict-check method is used, so optimizations are introduced that minimize the number of conflict-check operations that can occur. 
 		
-		\subsection{Data structures}
+		\subsection{Object relations}
 		
-			The data structures which implement point and stride tables are optimized for efficient merging, instead of efficient conflict checking. They have two methods, an "add" method, which simply adds an item to the table, and an extract method, which gets all current items in the table.
+			First, a high level overview of the main objects will be introduced, and later the specific data structures and will be detailed. 
+			%
+			At the highest level, a program has a single LoopStack, which contains a stack of LoopInstancses. LoopInstances store all information about a particular active loop. The most important information it stores is outlined in figure \ref{fig:loopinstance}. It contains the pending and history table, which in turn have separate tables for reads and writes. Note that the SD$^3$ only stores Stride and Point tables, the Bit Table is our own addition. 
+			
+			\begin{figure}[h]
+				\caption{LoopInstance Layout}
+				\label{fig:loopinstance}
+				\includegraphics[scale=0.8]{LoopData.pdf}
+			\end{figure}
+			
+		\subsection{Bit set implementation}
+		
+			Points and strides store which instruction accessed them. But some operations do not need that data, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
+			
+			\begin{figure}[h]
+				\caption{Bitset data structure}
+				\label{fig:loopinstance}
+			\includegraphics[scale=0.8]{bit_data.pdf}
+			\end{figure}
+		
+			Each of these operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the binary operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the bitwise \texttt{\&} operator. So set intersection is implemented in the bit-set described above by the following algorithm. % going though each element of the source set, deleteing it is not in the destination set
+			
+			\begin{algorithm}
+				\caption{BitSetIntersect}
+				\label{bitsetintersect}
+				\begin{algorithmic}[1]
+					\Function{BitSetIntersection}{Dest,Src}
+					
+					\For{$\text{block},\text{bit-arr} \in \text{Dest}$}
+					
+					\If {$\text{blocknum} \in \text{Src}$}
+					\State { Src.remove(blocknum)}
+					\Else
+					\State { bit-arr \texttt{\&=} Dest.get(blocknum)}
+					\EndIf
+					\EndFor
+					
+					\EndFunction
+				\end{algorithmic}
+			\end{algorithm}
 			
 			
-			%\caption{Data structures}
-			\begin{figure}
-				\label{stridepointfig}
-				\caption{text}
+			%The Bit table stores overall memory accesses, independently of the instruction it was accessed.
+			%This is in contrast to Point and Stride tables, which do store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information for performance reasons. In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
+			
+			
+			%The Bit Table stores information about the memory accesses independently from the instruction at which it was accessed, whereas 
+			
+			
+			%The LoopInstance object, which keeps track of all information for a loop, has separate tables for reads and writes
+		
+			%The data structures which implement point and stride tables are optimized for efficient merging, instead of efficient conflict checking. The details of their data structures will be explained when explaining merging. They have two methods, an "add" method, which simply adds an item to the table, and an extract method, which gets all current items in the table.
+			
+			
+			%\includegraphics[scale=0.6]{FullLoopData.pdf}
+			
+		\subsection{Merge}
+			The data structures which implement point and stride tables are optimized for efficient merging, instead of efficient conflict checking. They have two methods, an \texttt{add} method, which simply adds an item to the table, and an \texttt{extract} method, which gets all current items in the table.
+			
+			\begin{figure}[h]
+				\caption{Stride and Point Tables}
+				\label{fig:stridepoint}
 				\begin{minipage}{1.0\linewidth}
 					\begin{minipage}[u]{.5\linewidth}
 						\includegraphics[scale=0.8]{stride_data.pdf}
@@ -942,34 +999,30 @@ for(int i = 1; i < 12; += 3){
 				\end{minipage}
 			\end{figure}
 		
-			Points and strides store which instruction accessed them. But some operations do not need that data, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set:
+			The data structures allow for a simple and efficient merge operation. The bit set is merged by an in-place union operation. For the point and stride tables, the operation simply calls \texttt{extract} to collect all the elements from the source table, and adds them one at a time to the destination table. 
 			
-			\includegraphics[scale=0.8]{bit_data.pdf}
-				
-				
-			%\end{figure}
 			
-			We decided to create separate tables for reads and writes. So in a pending table, there is a 
+			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. Points are specified by instruction address, memory address, and access mode (read or write).
 			
-			The LoopInstance object, which keeps track of all information for a loop, has separate tables for reads and writes
+			For strides it is somewhat more complex, since strides need to be merged for efficiency reasons (see section \ref{sse:stride-descr}.5). But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride length, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stridepoint}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
-			\includegraphics[scale=0.8]{LoopData.pdf}
-		\subsection{Merge}
-		
-			The data structures allow for very simple merge operations. The bit set is merged by an in-place union operation. For the point and stride tables, the operation simply calls \texttt{extract} to collect all the elements from the source table, and adds them one at a time to the destination table. 
+			These criterion guarentee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree. However, since overlapping strides are always merged, there will never be overlapping strides. This property will be used to guarantee efficiency.
 			
-			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. For strides it is somewhat more complex, since strides need to be merged. But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride length, the strides would be the same if they were infinite length. Referring back to Figure \ref{stridepointfig}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
-			Then the inner binary search tree is used to check if the strides are close enough to actually merge. 
 			
-			\newcommand{\blackcell}{\cellcolor{black!50}}
-			\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c } 
+			To see how this can be done, consider the below example, where there are 3 strides in the table, and one stride being added. Each block represents one stride: the added one has 6 strides, and the other three have 1. Note that the first stride cannot be merged, and the other two can. 
+			
+			\newcommand{\bcl}{\cellcolor{black!50}}
+			\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c| } 
 				\hline
-				Current strides & \blackcell & \blackcell \\ 
+				Current strides & \bcl &  & & \bcl & & &  & \bcl & \\ 
 				\hline
-				Added strides & \blackcell & \blackcell \\ 
+				Added stride &  & & \multicolumn{5}{|c|}{\bcl} & & \\ 
 				\hline
 			\end{tabular}
+			
+			Since strides will never operlap, 
+			
 			
 %			\begin{algorithm}
 %				\caption{MassiveParrelelSum}\label{parellelsum}
@@ -996,38 +1049,29 @@ for(int i = 1; i < 12; += 3){
 
 			In SD$^3$, there is a single procedure that evaluates the information about memory conflicts. We broke CONFLICT-CHECK into two procedures for performance reasons. The first procedure, IsParallel, is a fast operation that simply checks the intersection of the bit sets of the reads of the pending table and the writes of the history table. It gives a binary answer, either the loop is parallel, or not. The second operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory by looking at points and strides, and is much slower. The diagram below shows the general outline of these operations. 
 			
-			\includegraphics[scale=0.8]{conflict-diagram.pdf}
+			\begin{figure}[h]
+				\caption{Conflict-Check outline}
+				\label{fig:conflict-check}
+				\includegraphics[scale=0.8]{conflict-diagram.pdf}
+			\end{figure}
 			
 			
 			\begin{algorithm}
 				\caption{CONFLICT-CHECK}\label{conflict-check}
 				\begin{algorithmic}[1]
 					%\Function{RecursiveSum}{A,s,e}
-					\If {$\textsc{IsParallel}$}
+					\If {$\textsc{IsParallel(H,P)}$}
 					\State Report parallel iteration 
-					\State \Return
+					\ElsIf{ConflictingIters $>$ TRUNCATE-OUTPUT-ITERS}
+					\State Report not parallel iteration 
+					\Else
+					\State InstrInfo = $\textsc{FindConflictingInstructions(H,P)}$
+					\State Report not parallel iteration with conflicts: InstrInfo
 					\EndIf
-					\If {$\textsc{NumConflitingIters} < \textsc{TRUNCATE_ITER_NUM}$}
-					\State Report conflicting iteration 
-					\State \Return 
-					\EndIf
-					%\EndIf
-					%\State
-					%\State Report conflicting iteration 
-					%\State \Return 
-%					\State $m \gets \floor{e-s}$
-%					\State $s_1 \gets \textsc{RecursiveSum}(A,s,m)$
-%					\State $s_2 \gets \textsc{RecursiveSum}(A,m,e)$
-%					\State \Return $s_1+s_2$
-%					\EndFunction
-%					\Function{StandardSum}{A}
-%					\State $s \gets 0$
-%					\For{$a \in A$}
-%					\State $s \gets s + a$
-%					\EndFor
-%					\EndFunction
 				\end{algorithmic}
 			\end{algorithm}
+			
+			
 			
 			\subsubsection{Find Overlapping}
 			\subsubsection{Filter Conflicting}
