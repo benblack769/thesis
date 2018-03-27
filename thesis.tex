@@ -641,8 +641,7 @@ LOOP END
 		
 		\subsection{Nested loop demonstration}
 		
-		This method also works for nested loops.  
-		In the vector-matrix multiplication procedure presented here, the inner loop is not parallel but the outer loop is. The pairwise method will be able to detect this. 
+		This method also works for nested loops. We will be using the vector-matrix multiplication procedure presented in Code Example \ref{vec-mat-mul} to demonstrate this. In this procedure, the inner loop is not parallel but the outer loop is. The pairwise method will be able to detect this. This section will walk through the execution of the pairwise method on that procedure. The locations of read and write instructions will be referenced using line numbers from Code Example \ref{vec-mat-mul-expanded}.
 		
 		\begin{codeexample}
 			\caption{Matrix-vector multiply}\label{vec-mat-mul}
@@ -657,8 +656,10 @@ for(int i = 0; i < output_size; i++){
 		\end{lstlisting}
 		\end{codeexample}
 		
-		Here is the procedure from above, but with each read and write on a separate line, so we can refer to reads and writes by line number.
+		
 
+\begin{codeexample}
+	\caption{Matrix-vector multiply with expanded memory accesses}\label{vec-mat-mul-expanded}
 		\begin{lstlisting}
 for(int i = 0; i < output_size; i++){	 	//outer loop
 	sum = 0					//WRITE sum
@@ -674,17 +675,31 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 	y[i] = tmp6				//WRITE y[i]
 }
 		\end{lstlisting}
+	\end{codeexample}
 		
 		
 		As the outer loop starts, line 2 writes to the memory address of \texttt{sum}. This is put into the pending table of the outer loop. Then the inner loop starts. Empty pending and history tables are created for the inner loop; these tables are separate from the outer loop's tables.
 		
-		The inner loop is processed very similarly to the cumulative sum example from earlier. A loop dependence on \texttt{sum} between lines 6 and 9 is logged for the inner loop.
+		The inner loop is processed very similarly to the cumulative sum example from earlier. A loop dependence on \texttt{sum} between lines 6 and 9 is logged for the inner loop. At the end of the inner loop, the history table will contain:
 		
-		When the inner loop finishes, its history table is merged into the pending table of the outer loop. Meaning all of the the reads of arrays \texttt{x} and \texttt{M[i]} are put in the pending table of the outer loop. In that pending table, \texttt{sum} is written to but not read. Since the first access is a write, it is considered killed, and none of the reads or writes to \texttt{sum} will be put in the pending table. When line 11 is executed, this read of \texttt{sum} is also is not put in the pending table, as \texttt{sum} is still killed. 
+		\begin{tabular}{ |c|c|c| } 
+			\hline
+			\multicolumn{3}{|c|}{History Table (inner loop)} \\
+			\hline
+			Instr & Memory & R/W \\ 
+			\hline
+			4 & \texttt{x[0],...x[input-size-1]} & R \\ 
+			5 & \texttt{M[0][0],...,M[0][input-size-1]} & R \\ 
+			6 & \texttt{sum} & R \\ 
+			9 & \texttt{sum} & W \\ 
+			\hline
+		\end{tabular}
+	
+		When the inner loop finishes, its history table is merged into the pending table of the outer loop. Meaning all of the reads of arrays \texttt{x} and \texttt{M[i]} are put in the pending table of the outer loop. In that pending table, \texttt{sum} is written to but not read; since the first access is a write, in the outer loop, \texttt{sum} is considered killed, and no furthur reads or writes to \texttt{sum} will be put in the pending table, including the accesses from in the inner loop, or the access on line 11. 
+		%When line 11 is executed, this read of \texttt{sum} is also is not put in the pending table, as \texttt{sum} is still killed. 
+		However, the first write to \texttt{sum} on line 2 is still an important access that could cause a dependency in an outer loop, so it still needs to be stored. 
 		
-		The first write to \texttt{sum} is still an important access that could cause a dependency in an outer loop, so it still needs to be stored. 
-		
-		At the end of the first iteration, the pending table will be
+		At the end of the first iteration of the outer loop, the pending table will be
 			
 		\begin{tabular}{ |c|c|c| } 
 			\hline
@@ -699,45 +714,47 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 			\hline
 		\end{tabular}
 	
-		This table will be merged into the history table of the outer loop, and the process will repeat. Note that there will not be any read after write dependence logged, since \text{sum} and \texttt{y[i]} are only written to, and \texttt{x[j]} and \texttt{M[i][j]} are only read from. So the pairwise method concludes that the outer loop is parallel. 
-		Intuitively this is true, the outer loop can be parallelized trivially if the memory of \texttt{sum} if duplicated for each thread. 
+		This table will be merged into the history table of the outer loop, and the process will repeat. Note that there will not be any read after write dependences logged, since \texttt{sum} and \texttt{y[i]} are only written to and \texttt{x[j]} and \texttt{M[i][j]} are only read from. Based on this analysis, the pairwise method concludes that the outer loop is parallel. 
+		Intuitively this is true; the outer loop can be parallelized trivially is the memory of \texttt{sum} is duplicated for each thread. 
 	
 		\subsection{Generalized algorithm}
 		
-		To generalize to arbitrary nested loops, the pairwise method keeps a stack of pending and history tables for all of the active loops. With this, we can describe a more precise algorithm for the pairwise method. 
+		To generalize this approach to arbitrary nested loops, the pairwise method keeps track of a global loop stack, a stack of pending and history tables for all of the active loops. With this, we can describe a more precise algorithm for the pairwise method. The significant procedures in this outline will be referenced later as specific implementations are described.
 		
 		\begin{algorithm}[H]
 			\caption{Pairwise method}\label{basic-pariwise}
 			\begin{enumerate}
-				\item When Loop $L$ starts, initialize empty pending and history tables for $L$, and push $L$ onto the loop stack. 
+				\item When loop $L$ starts, initialize empty pending and history tables for $L$, and push $L$ onto the loop stack.
 				
-				\item When a memory location $m$ is accessed by instruction $i$, when loop $L$ is at the top of the loop stack.
+				\item When a memory location $m$ is accessed by instruction $i$, and loop $L$ is at the top of the loop stack,
 					\begin{enumerate}
 						\item If location $m$ is killed in the pending table, do nothing. SUBTRACT-KILLED
-						\item Otherwise, put that information into the pending table. ADD-ACCESS
+						\item Otherwise, put that information into the pending table of loop $L$. ADD-ACCESS
 					\end{enumerate} 
 				
-				\item When an iteration of loop $L$ ends, 
+				\item When an iteration of loop $L$ ends,
 					\begin{enumerate}
-						\item Find conflicting memory locations between reads in the pending table, and writes in the history table. Report those conflicts. CONFLICT-CHECK
-						\item Merge pending table of into the history table. MERGE
+						\item Find conflicting memory locations between reads in the pending table and writes in the history table. Report those conflicts. CONFLICT-CHECK
+						\item Merge the pending table into the history table. MERGE
 					\end{enumerate} 
 				
-				\item When loop $L$ terminates:
+				\item When loop $L$ terminates, 
 					\begin{enumerate}
-						\item If there is an $L^\prime$ below $L$ on the loop stack:
-						\item Remove entries in history table of $L$ which are at killed memory locations of $L^\prime$'s memory location. SUBTRACT-KILLED
-						\item Merge history table of $L$ into pending table of $L^\prime$ MERGE
-						\item In any case, pop $L$ off the loops stack.
+						\item If there is a loop $L^\prime$ below $L$ on the loop stack,
+						\begin{enumerate}
+							\item Remove entries in the history table of $L$ that are at killed memory locations of $L^\prime$'s memory location. SUBTRACT-KILLED
+							\item Merge the history table of loop $L$ into pending table of loop $L^\prime$ MERGE
+						\end{enumerate} 
+						\item Pop $L$ off the loop stack.
 					\end{enumerate} 
 				
 			\end{enumerate}
 		\end{algorithm}
 	
-		An implementation of the pairwise method simply needs to define the data structures of the pending and history table, and make the capitalized procedures more precise. 
 	
 		\subsection{Naive implementation}
 		
+		An implementation of the pairwise method simply needs to define the data structures of the pending and history table, and make the capitalized procedures more precise.	
 		One natural implementation of the pairwise method goes like this:
 		
 		The pending and history tables are a hash table indexed by memory address, which holds sets of instructions. The tables for writes and reads are separated, so there are two pending tables, one for reads, and one for writes. Then the table procedures outlined in the pairwise algorithm description are implemented as follows:
@@ -939,7 +956,10 @@ for(int i = 1; i < 12; += 3){
 			
 		\subsection{Bit set implementation}
 		
-			Points and strides store which instruction accessed them. But some operations do not need that data, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
+			The Bit table stores a set of overall memory accesses, independently of the instruction it was accessed.
+			This is in contrast to Point and Stride tables, which store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information for performance reasons. In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
+			
+			%Points and strides store which instruction accessed them. But some operations do not need that information, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
 			
 			\begin{figure}[h]
 				\caption{Bitset data structure}
@@ -947,7 +967,7 @@ for(int i = 1; i < 12; += 3){
 			\includegraphics[scale=0.8]{bit_data.pdf}
 			\end{figure}
 		
-			Each of these operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the binary operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the bitwise \texttt{\&} operator. So set intersection is implemented in the bit-set described above by the following algorithm. % going though each element of the source set, deleteing it is not in the destination set
+			Each of these operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection as a representative example. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the boolean logical operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the \texttt{\&} operator. Set intersection is implemented in the bit-set described above by treating the outer set as a sparse set, and the bit array as a dense set. See Algorithm \ref{bitsetintersect} for details. % going though each element of the source set, deleteing it is not in the destination set
 			
 			\begin{algorithm}
 				\caption{BitSetIntersect}
@@ -1002,15 +1022,14 @@ for(int i = 1; i < 12; += 3){
 			The data structures allow for a simple and efficient merge operation. The bit set is merged by an in-place union operation. For the point and stride tables, the operation simply calls \texttt{extract} to collect all the elements from the source table, and adds them one at a time to the destination table. 
 			
 			
-			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. Points are specified by instruction address, memory address, and access mode (read or write).
+			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. %Points are specified by instruction address, memory address, and access mode (read or write).
 			
 			For strides it is somewhat more complex, since strides need to be merged for efficiency reasons (see section \ref{sse:stride-descr}.5). But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride length, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stridepoint}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
-			These criterion guarentee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree. However, since overlapping strides are always merged, there will never be overlapping strides. This property will be used to guarantee efficiency.
+			These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree. However, since overlapping strides are always merged, there will never be overlapping strides. This property will be used to guarantee efficiency.
 			
 			
-			
-			To see how this can be done, consider the below example, where there are 3 strides in the table, and one stride being added. Each block represents one stride: the added one has 6 strides, and the other three have 1. Note that the first stride cannot be merged, and the other two can. 
+			To see how this can be done, consider the below example, where there are 3 strides in the table, and one stride being added. Each grey block represents one stride: the added stride is six times longer than the other 3. The first stride cannot be merged with the added stride, and the other two can. 
 			
 			\newcommand{\bcl}{\cellcolor{black!50}}
 			\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c| } 
@@ -1021,7 +1040,7 @@ for(int i = 1; i < 12; += 3){
 				\hline
 			\end{tabular}
 			
-			Since strides will never operlap, 
+			Since strides in the table will never overlap, the stride directly below the added stride is the only possible stride that starts before it, and also could overlap. In the example, it only has to check the one stride shown on the left. Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
 			
 			
 %			\begin{algorithm}
@@ -1047,17 +1066,74 @@ for(int i = 1; i < 12; += 3){
 %			
 		\subsection{Conflict Check}
 
-			In SD$^3$, there is a single procedure that evaluates the information about memory conflicts. We broke CONFLICT-CHECK into two procedures for performance reasons. The first procedure, IsParallel, is a fast operation that simply checks the intersection of the bit sets of the reads of the pending table and the writes of the history table. It gives a binary answer, either the loop is parallel, or not. The second operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory by looking at points and strides, and is much slower. The diagram below shows the general outline of these operations. 
+			In SD$^3$, there is a single procedure that evaluates memory conflicts. We broke CONFLICT-CHECK into two procedures for performance reasons. The first procedure, IsParallel, is a fast operation that simply checks the intersection of the bit sets of the reads of the pending table and the writes of the history table. It gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory by looking at points and strides. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures. 
 			
-			\begin{figure}[h]
+			\begin{figure}
 				\caption{Conflict-Check outline}
 				\label{fig:conflict-check}
 				\includegraphics[scale=0.8]{conflict-diagram.pdf}
 			\end{figure}
 			
 			
+			Now, how does FindConflictingInstructions actually work? Similarly to SD$^3$, it is broken up into two steps. First, lists of strides and points are gathered by using \texttt{extract}. Then, these strides and points are treated as intervals, and the intervals that overlap are found in FindOverlapping. Finally, whether the strides and points actually overlap is calculated in FilterConflicting.
+			
+			\subsubsection{Find Overlapping}
+				
+				FindOverlapping uses a sliding window technique on sorted lists of intervals to compute a list of pairs of overlapping intervals. Call these lists A and B. The algorithm first sorts the two lists of intervals by their start. It considers each interval from A one at a time, call this interval $I$. It keeps a window of intervals of list B which overlap the start of $I$. Each time another interval from A is checked, the algorithm it drops the intervals which end before the new interval starts, and adds in all the intervals which start before the new interval starts, but end after it starts. Then it finds the intervals from B which start after $I$ starts, but before $I$ ends. Algorithm \ref{algo:findoverlapping} has psuedocode for this algorithm.
+				
+				\begin{algorithm}
+					\caption{Find Overlapping}
+					\label{algo:findoverlapping}
+				\begin{verbatim}
+				find_overlapping_intervals(A,B)
+				    sort A by first()
+				    sort B by first()
+				    overlap = Set()
+				    before_last = vector()
+				    ib = 0
+				    for interval in A
+				        new_before_last = vector()
+				        for item in before_last:
+				            if item.last() >= interval.first():
+				                new_before_last.append(item)
+				        swap(before_last,new_before_last)
+				
+				        increment ib until B[ib].first() >= interval.first()
+				        
+				        if B[ib].last() >= interval.first()
+				            before_last.append(B[ib])
+				
+				        for bl in before_last
+				            overlap.add(bl,interval)
+				
+				        for ib2 from ib until B[ib2].first() > interval.last()
+				            overlap.add(B[ib2],interval)
+				\end{verbatim}
+				\end{algorithm}
+			
+			\subsubsection{Filter Conflicting}
+		
+				Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm. We found it difficult to work out the details of this algorithm, so instead, we decided to use other methods. In particular, the vast majority of strided conflicts will be much easier to check. Many strides will be dense, every byte in between the start and end will be accessed. Many other possible conflicting strides will have the same stride length. And most of the remaining strides will have long interval overlap compared to the stride length, which means that the ordinary GCD test gives the correct answer.
+				Our method simply checks if these cases apply, and if so, calculates the answer. The few remaining cases can be checked with a slow algorithm which compares the strides element by element.
+				 
+				%In particular, it is important to note that having constant time comparison is not needed for algorithmic efficiency of the method. After all, each element of the stride is added one at a time, and it is only compari
+				
+			%Instead of using interval trees, we used data structures optimized towards merging strides and points. Points can only be merged if their instruction and memory address is the same, so they are stored by instruction and memory address. 
+			
+			\subsubsection{Truncated execution of FindConflictingInstructions}
+			
+			Because FindConflictingInstructions is a slow operation, it should be run as infrequently as possible to collect the information we need. Our method only runs it a constant number of times for a particular loop instance. This is made possible by two observations:
+			
+			\begin{enumerate}
+				\item If the loop iteration does not have any conflicts (discovered by running IsParallel), then we know that no instructions have conflicts, so we do not need to check them. 
+				\item  The conflicting instructions are simply guides to the programmer. As such they do not have to be 100\% accurate. In particular, if there are some instruction conflicts which are reported, and others which are not, this is not a serious problem. So this information can be truncated.  
+			\end{enumerate}
+			
+			These two observations give rise to the following procedure, which ensures that the FindConflictingInstructions() is only run a constant number of times:
+			
 			\begin{algorithm}
-				\caption{CONFLICT-CHECK}\label{conflict-check}
+				\caption{CONFLICT-CHECK}
+				\label{conflict-check}
 				\begin{algorithmic}[1]
 					%\Function{RecursiveSum}{A,s,e}
 					\If {$\textsc{IsParallel(H,P)}$}
@@ -1066,39 +1142,16 @@ for(int i = 1; i < 12; += 3){
 					\State Report not parallel iteration 
 					\Else
 					\State InstrInfo = $\textsc{FindConflictingInstructions(H,P)}$
+					\State ConflictingIters \texttt{+=} 1
 					\State Report not parallel iteration with conflicts: InstrInfo
 					\EndIf
 				\end{algorithmic}
 			\end{algorithm}
-			
-			
-			
-			\subsubsection{Find Overlapping}
-			\subsubsection{Filter Conflicting}
 		
-			%Instead of using interval trees, we used data structures optimized towards merging strides and points. Points can only be merged if their instruction and memory address is the same, so they are stored by instruction and memory address. 
+		\subsection{Subtract Killed}
+			
+			The SD$^3$ algorithm subtracts killed points and strides by a similar algorithm to their conflict-check method. We used the bit sets to do this instead. After all, killed bits are most easily described using the bit sets. We simply used the bit sets to check whether points and strides were killed or not one at a time. To guarantee runtime efficiency, the elements of a stride are checked one at a time, starting from the front of the stride, and one at a time. This process terminates at the first stride element that is not killed. 
 		
-		%\subsection{MERGE algorithm}
-			
-			
-			
-%		\subsection{CONFLICT-CHECK algorithm}
-%		
-%			Efficiency for CONFLICT-CHECK is n
-%		
-%		\subsection{Global read/write bit sets}
-%		
-%		The pairwise method is difficult to optimize since memory addresses needs to be paired with the code instruction that accessed it. But some operations are only concerned with total memory accesses, and do not need the associated instruction. %this requirement were not there, then one can simply used bit compressed sets, as described in section 1.6.
-%		
-%		%In the SD$^3$ method, all read and write information is stored in points and strides. 
-%		
-%		\subsubsection{Simple SUBTRACT-KILLED implementation}
-%		\subsubsection{Optimizing CONFLICT-CHECK for parallel loops}
-%		
-%		
-%		\subsubsection{Efficiency for large loops}
-%		\subsection{Finding overlapping strides efficiently}
-%		\subsection{Checking for intersection on overlapping strides}
 		
 	\section{Bit Compression Implementation}
 	
