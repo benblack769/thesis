@@ -755,14 +755,14 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 		\subsection{Naive implementation}
 		
 		An implementation of the pairwise method simply needs to define the data structures of the pending and history table, and make the capitalized procedures more precise.	
-		One natural implementation of the pairwise method goes like this:
+		The naive implementation of the pairwise method uses the following data structures and procedures:
 		
-		The pending and history tables are a hash table indexed by memory address, which holds sets of instructions. The tables for writes and reads are separated, so there are two pending tables, one for reads, and one for writes. Then the table procedures outlined in the pairwise algorithm description are implemented as follows:
+		The pending and history tables are implemented as a hash table indexed by memory addresses and which stores sets of instructions. To simplify the procedure, tables for writes and reads are separate, so there are two pending tables, one for reads and one for writes. The table procedures outlined in the pairwise algorithm description are implemented as follows:
 		
 		\begin{itemize}
-			\item SUBTRACT-KILLED: Check if there is an entry at that location in the write pending table but not the read pending table.
-			\item ADD-ACCESS: Get the read pending table if the access is a read, otherwise, get the write table. If there is no entry at the memory address of that table, add an entry, and put the instruction in the list. If there is an entry, add the accessed instruction to the set. 
+			\item ADD-ACCESS: Use the read pending table if the access is a read, otherwise, use the write table. If there is no entry for the memory address in that table, add an entry, and put the instruction from that new access in the set. If there is an entry, add the accessed instruction to the set. 
 			\item MERGE: Repeatedly add every access from the input table to the output table using ADD-ACCESS. 
+			\item SUBTRACT-KILLED: Check if there is an entry at that location in the write pending table but not the read pending table.
 			\item CONFLICT-CHECK: Go through every entry in the pending table, and check if it is a read, and that there is a corresponding entry in the 
 		\end{itemize}
 		
@@ -816,7 +816,7 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 		For example, here is code that accesses an array of memory in a strided fashion. Every third element of the array is written to. 
 		
 		\begin{lstlisting}
-for(int i = 1; i < 12; += 3){
+for(int i = 1; i < 12; i = i + 3){
 	B[i] = 1;
 }
 		\end{lstlisting}
@@ -838,18 +838,18 @@ for(int i = 1; i < 12; += 3){
 		\subsubsection{Detecting strides}
 		
 		The SD$^3$ method detects both the existence and interval of strided accesses. 
-		Some access patterns are not strided, and if so, the memory accesses should not be treated as strides. When access are strided, then the interval of the stride must be calculated.  
+		Some access patterns are not strided, and if so, the memory accesses should not be treated as strides. When accesses are strided, then the interval of the stride must be calculated dynamically.  
 		
-		SD$^3$ suggests using an online stride detection algorithm to calculate both existence and length of strides.
+		SD$^3$ suggests using an online stride detection algorithm to calculate both the existence and length of strides.
 		This algorithm keeps a global data structure separate from the loop stack which keeps track of separate state machines for every instruction. The state machine is organized as follows:
 		
 		\includegraphics[scale=0.6]{stride-detector}
 		
-		This state machine keeps track of the stride length and position of previous accesses, inferring the stride length of the current access. The strong stride-weak stride states allow for short interruptions in the stride pattern. 
+		This state machine keeps track of the stride length and position of previous accesses, inferring the stride length of the current access. The strong stride-weak stride states allow for short interruptions in otherwise consistent stride pattern. This may be helpful, for example, when accessing the rows of a two dimensional array. In this case, the access pattern may be unpredictable when switching between rows, but the overall stride pattern will remain the same. 
 		
 		\subsubsection{Data structure for non-strided accesses}
 		
-		Some memory access patterns are not strides. When this is the case, the SD$^3$ method calls these these accesses "points", and puts them in a "point table", which is similar in structure to the pending and history tables in the naive method. These are kept separate from the strides, which are put in the "stride table". There is both a stride and a point table inside each history and each pending table. 
+		Some memory access patterns are not strides. When this is the case, the SD$^3$ method calls these accesses "points", and puts them in a "point table", which is similar in structure to the pending and history tables in the naive method. These are kept separate from the strides, which are put in the "stride table". There is both a stride and a point table inside each history and each pending table. 
 		
 		\subsubsection{Data structure for strided accesses}
 		
