@@ -913,11 +913,65 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		We chose metrics based on the main differences between CPUs and GPUs. 
 		
-		\begin{itemize}
-			\item \#of times a branch path changes
-			\item Total memory footprint of a loop
-			\item etc...
-		\end{itemize}
+		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
+			\hline
+			Metric & Relevant hardware characteristic(s) \\
+			\hline \hline
+			Number of iterations per loop instance & Potential for massive parallelism \\
+			\hline
+			Length of loop iterations by instruction count & Potential for massive parallelism \\
+			\hline
+			Number of writes/reads & Memory bandwidth??? \\
+			\hline
+			Bytes accessed per instance & Memory bandwidth??? Compare w/Footprint for temporal locality? \\
+			\hline
+			Total memory footprint of loop & Compare with Bytes for temporal locality?  \\
+			\hline
+			Shared memory footprint between loop iterations & Cross-thread spacial locality \\
+			\hline
+			Strided accesses  & Latency vs bandwidth \\
+			\hline
+			Number of branch changes & Warp divergence and branch prediction \\
+			\hline
+		\end{tabular}
+		
+		%\subsubsection{Number of instructions per loop instance}
+		
+		\subsection{Loop size metrics}
+		\subsubsection{Number of iterations per loop instance}
+		\subsubsection{Length of loop iteration by instruction count}
+		\subsection{Memory metrics}
+		\subsubsection{Number of reads/writes}
+		\subsubsection{Bytes accessed per instance}
+		\subsubsection{Total memory footprint of loop}
+		\subsubsection{Shared memory footprint between loop iterations}
+		
+		GPUs have shared memory and caches which allow for efficient cross-thread memory reuse assuming the shared data is reasonably small. 
+		
+		We measure this by building maps of memory footprint of the loop and its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iterations as well as the total number if the instance. From that, the number of shared bytes between threads 
+		
+		\subsubsection{Strided accesses}
+		
+		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from low latency, and stall the pipeline. [CITATION???] CPUs also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
+		
+		We chose to capture this performance difference by measuring the number and length of strided accesses. 
+		
+		To find stride existence and length, we use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). % Then, we simply count the number of accesses which are of certain stride lengths, including zero length strides, and those that cannot be detected as strides. 
+		
+		\subsection{Branch metrics}
+		
+		At a low level, GPUs group together threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
+		
+		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. 
+		
+		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
+		
+		%\subsubsection{\# path changes}
+%		\begin{itemize}
+%			\item \#of times a branch path changes
+%			\item Total memory footprint of a loop
+%			\item etc...
+%		\end{itemize}
 		
 	\section{Workloads}
 		
