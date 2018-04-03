@@ -1019,15 +1019,15 @@ for(int i = 1; i < 12; i = i + 3){
 				\includegraphics[scale=0.8]{LoopData.pdf}
 			\end{figure}
 			
-			Given these data structures, the steps of the high-level algorithm are detailed in Algorithm \ref{new-memory-acc}.
+			Given these data structures, new memory accesses are processed as described in Algorithm \ref{new-memory-acc}, and loop iteration endings are described in Algorithm \ref{new-loop-iteration}.
 			
-			\begin{algorithm}[H]
+			\begin{algorithm}
 				\caption{New memory accesses}\label{new-memory-acc}
-					When a memory location $m$ is accessed by instruction $i$, and loop $L$ is at the top of the loop stack,
+					When a memory location $m$ is accessed by instruction $i$, and LoopInstance $L$ is at the top of the loop stack,
 					\begin{enumerate}
 						\item If the memory location $m$ is in the write AddressSet of the pending table, but not the read AddressSet, then $m$ is killed, so do nothing, and skip the rest of the steps. 
 						\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride, and if so, its stride distance $d$. 
-						\item Get the point table, stride table, and AddressSet
+						\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
 						\item If $m$ is a stride with stride distance $d$ then add it to the stride table.
 						\item If $m$ is not a stride, add it to the point table. 
 						\item Add the bytes accessed by $m$ to the AddressSet.
@@ -1035,14 +1035,55 @@ for(int i = 1; i < 12; i = i + 3){
 			\end{algorithm}
 			
 			
-			\begin{algorithm}[H]
+			\begin{algorithm}
 				\caption{Finishing a loop iteration}\label{new-loop-iteration}
+				When an iteration of loop $L$, with LoopInstance $I$ finishes,
 				\begin{enumerate}
-					\item 
-				\end{enumerate} 
+					\item Merge pending table contents into history table
+					\begin{enumerate}
+						\item Add every point and stride in the point and stride tables in the pending table into the corresponding point and stride tables of the history table
+						\item Union the pending AccessSets into the corresponding history AccessSets.
+						\item Clear the entire PendingTable.
+					\end{enumerate}
+					\item Check for conflicts between the pending and history tables
+					\begin{enumerate}
+						\item Determine if the iteration can be run in parallel by checking if the intersection of the pending table's read AccessSet and the history table's write AccessSet is $\emptyset$.
+						\item If the loop iteration is not parallel, find the pairs of instructions that conflict by
+						\begin{enumerate}
+							\item Get the list of all points/strides in the read pending table, and compare it the list of all points/strides in the write history table, and find a list of overlapping points/stride intervals.
+							\item Filter out the intervals which are not actually conflicting.
+						\end{enumerate}
+					\end{enumerate}
+				\end{enumerate}
 			\end{algorithm}
 
-			
+
+			\begin{algorithm}
+				\caption{Upon loop termination}\label{loop-termination}
+				
+				When loop $L$ terminates, with LoopInstance $I$ finishes, and Loop $L^\prime$ next on the LoopStack.
+				\begin{enumerate}
+					\item Remove all strides and points from the history table of $L$ which are Killed by the pending table of $L^\prime$.
+					\item Merge history table contents into pending table.
+				\end{enumerate}
+			\end{algorithm}
+		
+		\section{Adding accesses}
+		
+		\subsection{StrideDetector}
+		\subsection{StrideTable}
+		\subsection{PointTable}
+		%\subsection{AccessSet}
+		
+		\section{Checking conflicts}
+		
+		\subsection{IsParrelel}
+		\subsection{Find Overlapping}
+		\subsection{Filter Non-conflicting}
+		
+		\section{Merge}
+		
+		\subsection{Killed bits}
 			
 		\subsection{Bit set implementation}
 		
