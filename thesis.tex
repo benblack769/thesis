@@ -946,6 +946,12 @@ for(int i = 1; i < 12; i = i + 3){
 		\subsubsection{Total memory footprint of loop}
 		\subsubsection{Shared memory footprint between loop iterations}
 		
+		Global memory is expensive to access on both CPUs and GPUs. CPUs have a small number of cores, each with their own cache. These caches are optimized for temporal locality, i.e. the same memory being used across time.
+		
+		GPUs have hundreds of small cores, so they do not have their own cache. Instead, there are two different hardware features which both allow for fast access of memory which is shared across threads in a single timestep. One way is the shared memory, a different kind of memory in its own address space for local work-groups.
+		
+		 the groups of cores have shared memory caches to allow for . 
+		
 		GPUs have shared memory and caches which allow for efficient cross-thread memory reuse assuming the shared data is reasonably small. 
 		
 		We measure this by building maps of memory footprint of the loop and its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iterations as well as the total number if the instance. From that, the number of shared bytes between threads 
@@ -966,13 +972,6 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
 		
-		%\subsubsection{\# path changes}
-%		\begin{itemize}
-%			\item \#of times a branch path changes
-%			\item Total memory footprint of a loop
-%			\item etc...
-%		\end{itemize}
-		
 	\section{Workloads}
 		
 		To distinguish between applications that are best run on CPUs or GPUs, we first needed to get a good sample of programs with different characteristics. Some of these should be geared towards CPUs, and others should good cases for GPU acceleration. To get a wide variety of applications, we gathered applications from several different benchmarks: Rodinia, Parsec, and ..... 
@@ -992,21 +991,58 @@ for(int i = 1; i < 12; i = i + 3){
 		
 	\section{Stride Compression Implementation}
 	
-		The code that Kim et al. wrote to implement the SD$^3$ algorithm was sponsored by Intel, so it is closed source, and we cannot use it to detect parallelism. To achieve the goals of this paper, we still needed to detect parallelism without running out of system memory, so we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity. In particular, interval trees are bug-prone to implement ourselves, and we could not find an open source c++ implementation, so we chose to use other data structures. 
-		In addition, the the details of the Dynamic-GCD algorithm proved difficult to work out, so we used other techniques for finding stride conflicts.
-		 These were key features to ensure efficiency, more changes had to be made to improve efficiency. In particular, a slow conflict-check method is used, so optimizations are introduced that minimize the number of conflict-check operations that can occur. 
+		The code that Kim et al. wrote to implement the SD$^3$ algorithm was not made publicly available, so it is closed source, and we cannot use it to detect parallelism. To achieve the goals of this thesis, we still needed to detect parallelism without running out of system memory, so we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity. In particular, we thought implementing interval trees ourselves would be error-prone, and we could not find an open source C++ implementation, so we chose to use other data structures. 
+		In addition, the details of the Dynamic-GCD algorithm proved difficult to work out, so we used other techniques for finding stride conflicts.
+		 These were key features to ensure efficiency in the original SD$^3$ algorithm, so more changes had to be made to improve efficiency. In particular, a slow conflict-check method was used in our implementation, so optimizations were introduced that minimize the number of conflict-check operations that occur. 
 		
-		\subsection{Object relations}
+		\subsection{Algorithm and data structure overview}
 		
-			First, a high level overview of the main objects will be introduced, and later the specific data structures and will be detailed. 
-			%
-			At the highest level, a program has a single LoopStack, which contains a stack of LoopInstancses. LoopInstances store all information about a particular active loop. The most important information it stores is outlined in figure \ref{fig:loopinstance}. It contains the pending and history table, which in turn have separate tables for reads and writes. Note that the SD$^3$ only stores Stride and Point tables, the Bit Table is our own addition. 
+			%The key data structures and their use 
+			
+			First, a high level overview of the main data structures and objects will be introduced, and later the specific data structures and algorithms will be detailed. 
+			
+			At the highest level, a program has a single LoopStack, which contains a stack of LoopInstances. LoopInstances store all information about a particular active loop, including the pending and history tables.	
+			
+			There are three main data structures which are central to the algorithm. The purpose of these data structures is outlined here, and the details will be explained later. 
+			
+			\begin{itemize}
+				\item StrideTable: This table stores strided accesses and their instructions. Strides can be added efficiently to this table.
+				\item PointTable: This table stores non-strided accesses and their instructions. 
+				\item AddressSet: This structure is used as a set of memory addresses, without instructions. It has ordinary set operations, such as union, intersection, set subtraction, and inserting elements. It is used as an optimization only, as it stores strictly less information that the point and stride tables. 
+			\end{itemize}
+			
+			These data structures store the content of the pending and history tables, but reads and writes are stored separately. See Figure \ref{fig:loopinstance} for how these tables fit inside the LoopInstance. 
 			
 			\begin{figure}[h]
 				\caption{LoopInstance Layout}
 				\label{fig:loopinstance}
 				\includegraphics[scale=0.8]{LoopData.pdf}
 			\end{figure}
+			
+			Given these data structures, the steps of the high-level algorithm are detailed in Algorithm \ref{new-memory-acc}.
+			
+			\begin{algorithm}[H]
+				\caption{New memory accesses}\label{new-memory-acc}
+					When a memory location $m$ is accessed by instruction $i$, and loop $L$ is at the top of the loop stack,
+					\begin{enumerate}
+						\item If the memory location $m$ is in the write AddressSet of the pending table, but not the read AddressSet, then $m$ is killed, so do nothing, and skip the rest of the steps. 
+						\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride, and if so, its stride distance $d$. 
+						\item Get the point table, stride table, and AddressSet
+						\item If $m$ is a stride with stride distance $d$ then add it to the stride table.
+						\item If $m$ is not a stride, add it to the point table. 
+						\item Add the bytes accessed by $m$ to the AddressSet.
+					\end{enumerate} 
+			\end{algorithm}
+			
+			
+			\begin{algorithm}[H]
+				\caption{Finishing a loop iteration}\label{new-loop-iteration}
+				\begin{enumerate}
+					\item 
+				\end{enumerate} 
+			\end{algorithm}
+
+			
 			
 		\subsection{Bit set implementation}
 		
@@ -1017,7 +1053,7 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			\begin{figure}[h]
 				\caption{Bitset data structure}
-				\label{fig:loopinstance}
+				\label{fig:bitset}
 			\includegraphics[scale=0.8]{bit_data.pdf}
 			\end{figure}
 		
@@ -1078,7 +1114,7 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. %Points are specified by instruction address, memory address, and access mode (read or write).
 			
-			For strides it is somewhat more complex, since strides need to be merged for efficiency reasons (see section \ref{sse:stride-descr}.5). But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride length, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stridepoint}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
+			For strides it is somewhat more complex, since strides need to be merged for efficiency reasons (see section \ref{sse:stride-descr}.5). But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stridepoint}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
 			These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree. However, since overlapping strides are always merged, there will never be overlapping strides. This property will be used to guarantee efficiency.
 			
@@ -1167,7 +1203,7 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			\subsubsection{Filter Conflicting}
 		
-				Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm. We found it difficult to work out the details of this algorithm, so instead, we decided to use other methods. In particular, the vast majority of strided conflicts will be much easier to check. Many strides will be dense, every byte in between the start and end will be accessed. Many other possible conflicting strides will have the same stride length. And most of the remaining strides will have long interval overlap compared to the stride length, which means that the ordinary GCD test gives the correct answer.
+				Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm. We found it difficult to work out the details of this algorithm, so instead, we decided to use other methods. In particular, the vast majority of strided conflicts will be much easier to check. Many strides will be dense, every byte in between the start and end will be accessed. Many other possible conflicting strides will have the same stride distance. And most of the remaining strides will have long interval overlap compared to the stride distance, which means that the ordinary GCD test gives the correct answer.
 				Our method simply checks if these cases apply, and if so, calculates the answer. The few remaining cases can be checked with a slow algorithm which compares the strides element by element.
 				 
 				%In particular, it is important to note that having constant time comparison is not needed for algorithmic efficiency of the method. After all, each element of the stride is added one at a time, and it is only compari
