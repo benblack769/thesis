@@ -905,13 +905,39 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		We are interested in a related question. We are interested about the application characteristics that can help the programmer choose between different established hardware platforms. We are using workload characterization to understand the characteristics of single threaded CPU programs that are indicators of performance on other general purpose hardware, such as GPUs. We will gather applications and platform independent metrics that indicate important differences between the different hardware platforms. 
 		
-	\section{Metrics}
-	
-		An important contribution of this paper is using a metric of parallelizability in workload characterization. 
-		We created metrics in order to make use of this metric. 
-		In particular, since we evaluate loop level parallelizability, we chose to collect all other metrics at the loop level. 
+		\subsection{Important hardware characteristics under consideration}
 		
-		We chose metrics based on the main differences between CPUs and GPUs. 
+		\subsubsection{Scale of Parallelism}
+		\subsubsection{Inter-thread vs Intra-thread memory sharing}
+		\subsubsection{Predictability of memory accesses}
+		\subsubsection{Branch evaluation scheme}
+		%\subsubsection{Arithmetic intensity}
+		
+		Global memory is expensive to access on both CPUs and GPUs. CPUs have a small number of cores, each with their own cache. These caches are optimized for temporal locality, i.e. the same memory being used across time.
+		
+		GPUs have hundreds of small cores, so they do not have their own cache. Instead, there are two different hardware features which both allow for fast access of memory which is shared across threads in a single timestep. One way is the shared memory, a different kind of memory in its own address space for local work-groups.
+		
+		the groups of cores have shared memory caches to allow for . 
+		
+		GPUs have shared memory and caches which allow for efficient cross-thread memory reuse assuming the shared data is reasonably small. 
+		
+		We measure this by building maps of memory footprint of the loop and its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iterations as well as the total number if the instance. From that, the number of shared bytes between threads 
+		
+		\subsubsection{Strided accesses}
+		
+		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from low latency, and stall the instruction pipeline. [CITATION???] CPUs also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
+		
+		We chose to capture this performance difference by measuring the number and length of strided accesses. 
+		
+		To find stride existence and length, we use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). % Then, we simply count the number of accesses which are of certain stride lengths, including zero length strides, and those that cannot be detected as strides. 
+		
+		\subsection{Branch metrics}
+		
+		At a low level, GPUs group together threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
+		
+		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. 
+		
+		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
 		
 		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
 			\hline
@@ -935,6 +961,16 @@ for(int i = 1; i < 12; i = i + 3){
 			\hline
 		\end{tabular}
 		
+	
+	\section{Metrics}
+	
+		An important contribution of this paper is using a metric of parallelizability in workload characterization. 
+		We created metrics in order to make use of this metric. 
+		In particular, since we evaluate loop level parallelizability, we chose to collect all other metrics at the loop level. 
+		
+		We chose metrics based on the main differences between CPUs and GPUs. 
+		
+		
 		%\subsubsection{Number of instructions per loop instance}
 		
 		\subsection{Loop size metrics}
@@ -944,33 +980,7 @@ for(int i = 1; i < 12; i = i + 3){
 		\subsubsection{Number of reads/writes}
 		\subsubsection{Bytes accessed per instance}
 		\subsubsection{Total memory footprint of loop}
-		\subsubsection{Shared memory footprint between loop iterations}
 		
-		Global memory is expensive to access on both CPUs and GPUs. CPUs have a small number of cores, each with their own cache. These caches are optimized for temporal locality, i.e. the same memory being used across time.
-		
-		GPUs have hundreds of small cores, so they do not have their own cache. Instead, there are two different hardware features which both allow for fast access of memory which is shared across threads in a single timestep. One way is the shared memory, a different kind of memory in its own address space for local work-groups.
-		
-		 the groups of cores have shared memory caches to allow for . 
-		
-		GPUs have shared memory and caches which allow for efficient cross-thread memory reuse assuming the shared data is reasonably small. 
-		
-		We measure this by building maps of memory footprint of the loop and its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iterations as well as the total number if the instance. From that, the number of shared bytes between threads 
-		
-		\subsubsection{Strided accesses}
-		
-		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from low latency, and stall the pipeline. [CITATION???] CPUs also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
-		
-		We chose to capture this performance difference by measuring the number and length of strided accesses. 
-		
-		To find stride existence and length, we use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). % Then, we simply count the number of accesses which are of certain stride lengths, including zero length strides, and those that cannot be detected as strides. 
-		
-		\subsection{Branch metrics}
-		
-		At a low level, GPUs group together threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
-		
-		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. 
-		
-		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
 		
 	\section{Workloads}
 		
@@ -988,6 +998,17 @@ for(int i = 1; i < 12; i = i + 3){
 		included in David Patterson’s 2005 talk, 2004. URL http://www.lanl.gov/orgs/
 		hpc/salishan/salishan2005/davidpatterson.pdf.
 		\footnote{\cite{Che:2010}}
+		
+	\section{Experiment design}
+		
+		To collect the 
+		
+		\begin{enumerate}
+			%\item Run the workload natively to check native memory consumption
+			\item Use LoopProf to evaluate the application's loop starts and ends
+			\item Using those loop information, simulate the application again to collect the loop dependent metrics
+			\item Using the same loop information, simulate the application while running a parrelleism detection tool to collect loop parrelleization information. 
+		\end{enumerate}
 		
 	\section{Stride Compression Implementation}
 	
@@ -1286,8 +1307,60 @@ for(int i = 1; i < 12; i = i + 3){
 		
 	\section{Bit Compression Implementation}
 	
+	\chapter{Results}
+	
+	\section{Intro}
+	
+	
+		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
+			\hline
+			Metric & Relevant hardware characteristic(s) \\
+			\hline \hline
+			Number of iterations per loop instance & Potential for massive parallelism \\
+			\hline
+			Length of loop iterations by instruction count & Potential for massive parallelism \\
+			\hline
+			Number of writes/reads & Memory bandwidth??? \\
+			\hline
+			Bytes accessed per instance & Memory bandwidth??? Compare w/Footprint for temporal locality? \\
+			\hline
+			Total memory footprint of loop & Compare with Bytes for temporal locality?  \\
+			\hline
+			Shared memory footprint between loop iterations & Cross-thread spacial locality \\
+			\hline
+			Strided accesses  & Latency vs bandwidth \\
+			\hline
+			Number of branch changes & Warp divergence and branch prediction \\
+			\hline
+		\end{tabular}
 		
 		
+	
+	
+		\begin{tabular}{ |l|l|l| }
+			\hline
+			Application          & Suite   & Input  \\ \hline
+			\hline
+			B+tree & Rodinia  &     \\ \hline
+			Back Propagation & Rodinia  &    \\ \hline
+			Breadth First Search & Rodinia  &    \\ \hline
+			CFD & Rodinia  &    \\ \hline
+			Heartwall & Rodinia  &   \\ \hline
+			Hotspot & Rodinia  &    \\ \hline
+			Hotspot3d & Rodinia  &    \\ \hline
+			kmeans & Rodinia  &     \\ \hline
+			lavaMD & Rodinia  &     \\ \hline
+			leukocyte & Rodinia  &     \\ \hline
+			LU Decomposition & Rodinia    &  \\ \hline
+			Myocite & Rodinia  &     \\ \hline
+			Nearest Neighbor & Rodinia  &     \\ \hline
+			Needleman-Wunsch & Rodinia  &     \\ \hline
+			ParticleFilter & Rodinia  &     \\ \hline
+			PathFinder & Rodinia  &     \\ \hline
+			SRAD & Rodinia  &     \\ \hline
+			StreamCluster & Rodinia  &    \\ \hline
+		\end{tabular}
+	
 \chapter{chpt2}
 		%\subsection{Bit compression}
 		
