@@ -1120,12 +1120,9 @@ for(int i = 1; i < 12; i = i + 3){
 		
 			Points (non-strided accesses) are added to the PointTable during new memory accesses and merges. The PointTable is designed so that redundant points are not duplicated in the table. 
 			
-			When a point is added to the table, it checks if there is a point with the same instr-addr, and mem-addr in the table.
-			
-			Recall that Points are specified by instruction address, memory address, and access mode (read or write). 
-			
-			When 
-			In Figure \ref{fig:point-table}, you can see that the a Point is stored for each instruction and memory address. 
+			The PointTable is simply a set of Points keyed on instruction address and memory address see figure \ref{fig:point-table}. When a point is added, its location in the set is checked. If there is an element there already, nothing happens, otherwise the point is added to the set. 
+			%Recall that Points are specified by instruction address, memory address, and access mode (read or write). 
+			%In Figure \ref{fig:point-table}, you can see that the a Point is stored for each instruction and memory address. 
 			
 			\begin{figure}[h]
 				\caption{Point Table}
@@ -1145,18 +1142,18 @@ for(int i = 1; i < 12; i = i + 3){
 			Strides also added to the StrideTable during new memory accesses and merges. 			
 			When possible, strides need to be merged into existing strides in the table when being added. This is critical for compression (see section \ref{sse:stride-descr}.5). The data structure is designed to make this process simple and efficient. 
 			
-			The StrideTable is a unordered set of ordered sets of strides. The outside set holds sets of strides which are all mergeable. As shown in Figure \ref{fig:stride-table}, the outer set is k  The inside set (which is ordered by the first element) holds strides which are 
-			
-			Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stride-table}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
+			At a high level, the StrideTable is a unordered set of ordered sets of strides (see Figure \ref{fig:stride-table}). The outer set ensures that a particular inner set stores strides which are mergeable if they adjoin. The inner set is used to check if the strides do adjoin, in which case, they are mergeable.
 			
 			\begin{figure}[h]
 				\caption{Stride Table}
 				\label{fig:stride-table}
 				\includegraphics[scale=0.8]{stride_data.pdf}
 			\end{figure}
-		
-			These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree. However, since overlapping strides are always merged, there will never be overlapping strides. This property will be used to guarantee efficiency.
+			 
 			
+			As shown in Figure \ref{fig:stride-table}, the outer set is keyed on the instruction address, the stride distance, and the stride start modulo the stride distance. Strides which have these criteria in common are mergable if they adjoin, since These criteria ensure that all the strides in the inside set of strides which are all mergeable. 
+			
+			The inside set is ordered by the first element in the stride. Overlapping strides are always merged, there will never be overlapping strides in the set. This property will be used to guarantee efficiency.
 			
 			To see how this can be done, consider the below example, where there are 3 strides in the table, and one stride being added. Each grey block represents one stride: the added stride is six times longer than the other 3. The first stride cannot be merged with the added stride, and the other two can. 
 			
@@ -1170,6 +1167,10 @@ for(int i = 1; i < 12; i = i + 3){
 			\end{tabular}
 			
 			Since strides in the table will never overlap, the stride directly below the added stride is the only possible stride that starts before it, and also could overlap. In the example, it only has to check the one stride shown on the left. Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
+			
+			%Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stride-table}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
+			
+			%These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree.
 		
 		\section{Checking conflicts}
 		
@@ -1183,21 +1184,24 @@ for(int i = 1; i < 12; i = i + 3){
 			
 		\subsection{AccessSet implementation}
 			
-			The AccessSet stores a set of memory addresses. Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
+			The AccessSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
+			
+			%In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
+			
+			Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this integer set efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
 			
 			\begin{figure}[H]
-				\caption{Bitset data structure}
+				\caption{AddressSet data structure}
 				\label{fig:bitset}
 				\includegraphics[scale=0.8]{bit_data.pdf}
 			\end{figure}
 			
-			The Bit table stores a set of overall memory accesses, independently of the instruction it was accessed.
-			This is in contrast to Point and Stride tables, which store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information for performance reasons. In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
+			%The Bit table stores a set of overall memory accesses, independently of the instruction it was accessed.
 			
 			%Points and strides store which instruction accessed them. But some operations do not need that information, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
 			
 		
-			Each of these operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection as a representative example. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the boolean logical operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the \texttt{\&} operator. Set intersection is implemented in the bit-set described above by treating the outer set as a sparse set, and the bit array as a dense set. See Algorithm \ref{bitsetintersect} for details. % going though each element of the source set, deleteing it is not in the destination set
+			Each of the operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection as a representative example. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the boolean logical operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the \texttt{\&} operator. Set intersection is implemented in the bit-set described above by treating the outer set as a sparse set, and the bit array as a dense set. See Algorithm \ref{bitsetintersect} for details. % going though each element of the source set, deleteing it is not in the destination set
 			
 			\begin{algorithm}
 				\caption{BitSetIntersect}
@@ -1327,6 +1331,8 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		
 	\section{Bit Compression Implementation}
+	
+		
 	
 	\chapter{Results}
 	
