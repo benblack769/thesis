@@ -907,21 +907,47 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		Traditionally, hardware researchers are interested in the sorts of hardware characteristics that are important in application performance. They use workload characterization to understand how trade-offs in hardware design would affect various application's performance. To accomplish this, they collect metrics on the applications they want to optimize that are informative about the sorts of hardware trade-offs they are considering making. 
 		
-		We are interested in a related question. We are interested about the application characteristics that can help the programmer choose between different established hardware platforms. We are using workload characterization to understand the characteristics of single threaded CPU programs that are indicators of performance on other general purpose hardware, such as GPUs. We will gather applications and platform independent metrics that indicate important differences between the different hardware platforms. 
+		We are interested in a related question: the application characteristics that can help the programmer choose between different established hardware platforms. We use workload characterization to understand the characteristics of single threaded CPU programs that are indicators of performance on other general purpose hardware, such as GPUs. We gathered applications and platform independent metrics that indicate important differences between the different hardware platforms. 
 		
 		\subsection{Important hardware characteristics under consideration}
+		
+		This thesis identifies several different hardware features as important, and attempts to capture in metrics. 
 		
 		\subsubsection{Scale of Parallelism}
 		
 		GPUs will not be faster than CPUs unless there is a high degree of parallelism, and substantial work to be done. GPUs have hundreds of cores, where CPUs at most two dozen or so. However, CPU cores are much faster. So GPUs will not be effective unless the work can be split over hundreds of threads. In addition, each kernel call must do substantial work, because the overhead of calling kernels is sometimes very high.  
 		
+		We suggest using the number of iterations in parallel loops, as well as the number of instructions each of those iterations contains to measure the scale of parallelism.
 		% memory must be transfered back and forth between In addition, if the computation is extremely simple, say,  sometimes the cost of tran
 		
 		%GPUs are only useful when the algorithm can be divided into many threads, each of which has substantial content.
 		
 		%GPUs can run hundreds of threads have hundreds of are only useful when 
 		
+		
+		\subsubsection{Predictability of memory accesses}
+		
+		
+		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from low latency, and stall the instruction pipeline. 
+		%[CITATION???] possibly file:///C:/Users/weepi/Documents/thesis/papers/CCWS.pdf 
+		CPUs are much better at handling unpredictable memory, since they have much larger caches. % also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
+		
+		We chose to capture this performance difference by measuring the number and length of strided accesses. 
+		We use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). 
+		
+		% Then, we simply count the number of accesses which are of certain stride lengths, including zero length strides, and those that cannot be detected as strides. 
+		
+		\subsubsection{Parallelism Model}
+		
+		At a low level, GPUs execute threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
+		
+		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. 
+		
+		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
+		
 		\subsubsection{Inter-thread vs Intra-thread memory sharing}
+		
+		
 		
 		Global memory is expensive to access on both CPUs and GPUs. CPUs have a small number of cores, each with their own cache. These caches are optimized for temporal locality, i.e. the same memory being used across time.
 		
@@ -932,25 +958,6 @@ for(int i = 1; i < 12; i = i + 3){
 		GPUs have shared memory and caches which allow for efficient cross-thread memory reuse assuming the shared data is reasonably small. 
 		
 		We measure this by building maps of memory footprint of the loop and its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iterations as well as the total number if the instance. From that, the number of shared bytes between threads 
-		
-		
-		\subsubsection{Predictability of memory accesses}
-		
-		
-		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from low latency, and stall the instruction pipeline. [CITATION???] CPUs also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
-		
-		We chose to capture this performance difference by measuring the number and length of strided accesses. 
-		
-		To find stride existence and length, we use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). % Then, we simply count the number of accesses which are of certain stride lengths, including zero length strides, and those that cannot be detected as strides. 
-		
-		\subsubsection{Parallelism Model}
-		
-		At a low level, GPUs group together threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
-		
-		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. 
-		
-		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
-		
 		
 		%\subsubsection{Arithmetic intensity}
 		\subsubsection{Strided accesses}
