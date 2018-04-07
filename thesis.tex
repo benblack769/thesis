@@ -947,22 +947,44 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsubsection{Inter-thread vs Intra-thread memory sharing}
 		
+		CPUs theads have much larger cache capacity than GPU threads, since there are simply many more GPU threads active at a given time. \footnote{\cite{Jia:6835938}} This means that GPU threads cannot rely on caches to exploit temporal locality to the same degree that CPU threads can. Instead, GPU caches effectively exploit cross-thread locality. 
 		
+		To capture this, we measure the amount of memory shared between loop iterations vs reaccessed within a single iteration.
+		We construct maps of the memory footprint of the loop and each of its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iteration as well whole instance. %From that, the number of shared bytes between threads 
 		
-		Global memory is expensive to access on both CPUs and GPUs. CPUs have a small number of cores, each with their own cache. These caches are optimized for temporal locality, i.e. the same memory being used across time.
-		
-		GPUs have hundreds of small cores, so they do not have their own cache. Instead, there are two different hardware features which both allow for fast access of memory which is shared across threads in a single timestep. One way is the shared memory, a different kind of memory in its own address space for local work-groups.
-		
-		the groups of cores have shared memory caches to allow for . 
-		
-		GPUs have shared memory and caches which allow for efficient cross-thread memory reuse assuming the shared data is reasonably small. 
-		
-		We measure this by building maps of memory footprint of the loop and its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iterations as well as the total number if the instance. From that, the number of shared bytes between threads 
-		
+%		
+%		We capture this 
+%		
+%		CPU caches are designed to exploit temporal locality. If some piece of memory is accessed, and it is accessed again soon afterwards, the second access should be fast.
+%		
+%		
+%		
+%		These caches are quite large, typically 32kb for L1 cache, and 256kb for the L2 cache, so they allow for long temporal locality. 
+%		
+%		GPU caches and shard memory are not designed to capture long temporal locality. Caches are small, and are shared between many threads. 
+%		
+%		\footnote{\cite{Rogers:2012:CWS:2457472.2457487}}
+%		
+%		GPU caches 
+%		
+%		Global memory is expensive to access on both CPUs and GPUs. CPUs have a small number of cores, each with their own cache. These caches are optimized for temporal locality, i.e. the same memory being used across time.
+%		
+%		GPUs have hundreds of small cores, so they do not have their own cache. Instead, there are two different hardware features which both allow for fast access of memory which is shared across threads in a single timestep. One way is the shared memory, a different kind of memory in its own address space for local work-groups.
+%		
+%		the groups of cores have shared memory caches to allow for . 
+%		
+%		GPUs have shared memory and caches which allow for efficient cross-thread memory reuse assuming the shared data is reasonably small. 
+%
+
 		%\subsubsection{Arithmetic intensity}
-		\subsubsection{Strided accesses}
+	
+	\section{Metrics}
 		
-		\subsection{Branch metrics}
+		An important contribution of this paper is using a metric of parallelizability in workload characterization. 
+		We created metrics in order to make use of this metric. 
+		In particular, since we evaluate loop level parallelizability, we chose to collect all other metrics at the loop level. 
+		
+		We chose metrics based on the main differences between CPUs and GPUs. 
 		
 		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
 			\hline
@@ -985,27 +1007,28 @@ for(int i = 1; i < 12; i = i + 3){
 			Number of branch changes & Warp divergence and branch prediction \\
 			\hline
 		\end{tabular}
-		
 	
-	\section{Metrics}
+
+
+
+	\section{Experiment design}
 	
-		An important contribution of this paper is using a metric of parallelizability in workload characterization. 
-		We created metrics in order to make use of this metric. 
-		In particular, since we evaluate loop level parallelizability, we chose to collect all other metrics at the loop level. 
+		To collect the 
 		
-		We chose metrics based on the main differences between CPUs and GPUs. 
-		
-		
-		%\subsubsection{Number of instructions per loop instance}
-		
-		\subsection{Loop size metrics}
-		\subsubsection{Number of iterations per loop instance}
-		\subsubsection{Length of loop iteration by instruction count}
-		\subsection{Memory metrics}
-		\subsubsection{Number of reads/writes}
-		\subsubsection{Bytes accessed per instance}
-		\subsubsection{Total memory footprint of loop}
-		
+		\begin{enumerate}
+			%\item Run the workload natively to check native memory consumption
+			\item Use LoopProf to evaluate the application's loop starts and ends
+			\item Using those loop information, simulate the application again to collect the loop dependent metrics
+			\item Using the same loop information, simulate the application while running a parrelleism detection tool to collect loop parrelleization information. 
+		\end{enumerate}
+		%		\subsection{Loop size metrics}
+		%		\subsubsection{Number of iterations per loop instance}
+		%		\subsubsection{Length of loop iteration by instruction count}
+		%		\subsection{Memory metrics}
+		%		\subsubsection{Number of reads/writes}
+		%		\subsubsection{Bytes accessed per instance}
+		%		\subsubsection{Total memory footprint of loop}
+		%	
 		
 	\section{Workloads}
 		
@@ -1024,16 +1047,7 @@ for(int i = 1; i < 12; i = i + 3){
 		hpc/salishan/salishan2005/davidpatterson.pdf.
 		\footnote{\cite{Che:2010}}
 		
-	\section{Experiment design}
 		
-		To collect the 
-		
-		\begin{enumerate}
-			%\item Run the workload natively to check native memory consumption
-			\item Use LoopProf to evaluate the application's loop starts and ends
-			\item Using those loop information, simulate the application again to collect the loop dependent metrics
-			\item Using the same loop information, simulate the application while running a parrelleism detection tool to collect loop parrelleization information. 
-		\end{enumerate}
 		
 	\section{Stride Compression Implementation}
 	
