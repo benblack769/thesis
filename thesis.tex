@@ -843,7 +843,11 @@ for(int i = 1; i < 12; i = i + 3){
 		SD$^3$ suggests using an online stride detection algorithm to calculate both the existence and length of strides.
 		This algorithm keeps a global data structure separate from the loop stack which keeps track of separate state machines for every instruction. The state machine is organized as follows:
 		
-		\includegraphics[scale=0.6]{stride-detector}
+		\begin{figure}[h]
+			\caption{Stride detector state machine}
+			\label{fig:stride-detector}
+			\includegraphics[scale=0.6]{stride-detector}
+		\end{figure}
 		
 		This state machine keeps track of the stride length and position of previous accesses, inferring the stride length of the current access. The strong stride-weak stride states allow for short interruptions in otherwise consistent stride pattern. This may be helpful, for example, when accessing the rows of a two dimensional array. In this case, the access pattern may be unpredictable when switching between rows, but the overall stride pattern will remain the same. 
 		
@@ -880,7 +884,7 @@ for(int i = 1; i < 12; i = i + 3){
 		SD$^3$ introduces a new algorithm called Dynamic-GCD which efficiently finds overlap between strides. 
 		To under how constant time stride overlap checking is possible, consider infinite length strides. Take two infinite length strides, with stride length $a$ and $b$. Take two points, one from each stride, and calculate the distance between them. Call this distance $c$. Then there is an integer $x$ and $y$ such that $ax + by = c$ iff the strides conflict. This condition is in turn equivalent to $c = 0 \mod (\gcd(a,b))$, where $\gcd(a,b)$ is the greatest common denominator of $a$ and $b$. This test can be done in constant time with the well known Euclidean algorithm for the GCD. Now, finite strides sometimes do not intersect when their infinite counterparts do, so the Dynamic-GCD algorithm gives a similar, but more complex test than the above that uses the Extended Euclidean algorithm to exactly compute intersection for finite strides. 
 		
-	\section{Bit compression}
+	\section{Bit compression}\label{s:bit-compress}
 	
 		A strided format is not the only method of compressing memory accesses. Memory accesses can also be compressed effectively using bit arrays. A bit array is simply an array of boolean variables which are stored inside individual bits, instead of in bytes, like ordinary C variables. 
 		
@@ -901,17 +905,23 @@ for(int i = 1; i < 12; i = i + 3){
 	
 		Workload characterization is a general technique to measure how applications use hardware features. Workload characterization uses dynamic analysis on a set of applications running on some set of hardware and collecting the runtime characteristics of the software. 
 		
-		Traditionally, hardware researchers are interested in the sorts of hardware characteristics that are important in application performance. They use workload characterization to understand how trade-offs in hardware design would affect various applications’ performance. To accomplish this, they collect metrics on the applications they want to optimize that are informative about the sorts of hardware trade-offs they are considering making. 
+		Traditionally, hardware researchers are interested in the sorts of hardware characteristics that are important in application performance. They use workload characterization to understand how trade-offs in hardware design would affect various application's performance. To accomplish this, they collect metrics on the applications they want to optimize that are informative about the sorts of hardware trade-offs they are considering making. 
 		
 		We are interested in a related question. We are interested about the application characteristics that can help the programmer choose between different established hardware platforms. We are using workload characterization to understand the characteristics of single threaded CPU programs that are indicators of performance on other general purpose hardware, such as GPUs. We will gather applications and platform independent metrics that indicate important differences between the different hardware platforms. 
 		
 		\subsection{Important hardware characteristics under consideration}
 		
 		\subsubsection{Scale of Parallelism}
+		
+		GPUs will not be faster than CPUs unless there is a high degree of parallelism, and substantial work to be done. GPUs have hundreds of cores, where CPUs at most two dozen or so. However, CPU cores are much faster. So GPUs will not be effective unless the work can be split over hundreds of threads. In addition, each kernel call must do substantial work, because the overhead of calling kernels is sometimes very high.  
+		
+		% memory must be transfered back and forth between In addition, if the computation is extremely simple, say,  sometimes the cost of tran
+		
+		%GPUs are only useful when the algorithm can be divided into many threads, each of which has substantial content.
+		
+		%GPUs can run hundreds of threads have hundreds of are only useful when 
+		
 		\subsubsection{Inter-thread vs Intra-thread memory sharing}
-		\subsubsection{Predictability of memory accesses}
-		\subsubsection{Branch evaluation scheme}
-		%\subsubsection{Arithmetic intensity}
 		
 		Global memory is expensive to access on both CPUs and GPUs. CPUs have a small number of cores, each with their own cache. These caches are optimized for temporal locality, i.e. the same memory being used across time.
 		
@@ -923,7 +933,9 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		We measure this by building maps of memory footprint of the loop and its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iterations as well as the total number if the instance. From that, the number of shared bytes between threads 
 		
-		\subsubsection{Strided accesses}
+		
+		\subsubsection{Predictability of memory accesses}
+		
 		
 		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from low latency, and stall the instruction pipeline. [CITATION???] CPUs also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
 		
@@ -931,7 +943,7 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		To find stride existence and length, we use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). % Then, we simply count the number of accesses which are of certain stride lengths, including zero length strides, and those that cannot be detected as strides. 
 		
-		\subsection{Branch metrics}
+		\subsubsection{Parallelism Model}
 		
 		At a low level, GPUs group together threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
 		
@@ -939,17 +951,23 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
 		
+		
+		%\subsubsection{Arithmetic intensity}
+		\subsubsection{Strided accesses}
+		
+		\subsection{Branch metrics}
+		
 		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
 			\hline
 			Metric & Relevant hardware characteristic(s) \\
 			\hline \hline
-			Number of iterations per loop instance & Potential for massive parallelism \\
+			Number of iterations per loop instance & Scale of Parallelism \\
 			\hline
-			Length of loop iterations by instruction count & Potential for massive parallelism \\
+			Length of loop iterations by instruction count & Scale of Parallelism \\
 			\hline
-			Number of writes/reads & Memory bandwidth??? \\
+			Number of writes/reads & ??? \\
 			\hline
-			Bytes accessed per instance & Memory bandwidth??? Compare w/Footprint for temporal locality? \\
+			Bytes accessed per instance & ??? \\
 			\hline
 			Total memory footprint of loop & Compare with Bytes for temporal locality?  \\
 			\hline
@@ -1014,7 +1032,7 @@ for(int i = 1; i < 12; i = i + 3){
 	
 		The code that Kim et al. wrote to implement the SD$^3$ algorithm was not made publicly available, so it is closed source, and we cannot use it to detect parallelism. To achieve the goals of this thesis, we still needed to detect parallelism without running out of system memory, so we chose to implement the algorithm ourselves. As we had limited time to implement it, we decided to make changes to the algorithm for simplicity. In particular, we thought implementing interval trees ourselves would be error-prone, and we could not find an open source C++ implementation, so we chose to use other data structures. 
 		In addition, the details of the Dynamic-GCD algorithm proved difficult to work out, so we used other techniques for finding stride conflicts.
-		 These were key features to ensure efficiency in the original SD$^3$ algorithm, so more changes had to be made to improve efficiency. In particular, a slow conflict-check method was used in our implementation, so optimizations were introduced that minimize the number of conflict-check operations that occur. 
+		These were key features to ensure efficiency in the original SD$^3$ algorithm, so more changes had to be made to improve efficiency. In particular, a slow conflict-check method was used in our implementation, so optimizations were introduced that minimize the number of conflict-check operations that occur. 
 		
 		\subsection{Algorithm and data structure overview}
 		
@@ -1022,7 +1040,7 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			First, a high level overview of the main data structures and objects will be introduced, and later the specific data structures and algorithms will be detailed. 
 			
-			At the highest level, a program has a single LoopStack, which contains a stack of LoopInstances. LoopInstances store all information about a particular active loop, including the pending and history tables.	
+			At the highest level, a program has a single LoopStack, which contains a stack of LoopInstances. LoopInstances store all information about a particular active loop, including the pending and history tables.	Separate from the LoopStack, there is a StrideDetector for each instruction that accesses memory. 
 			
 			There are three main data structures which are central to the algorithm. The purpose of these data structures is outlined here, and the details will be explained later. 
 			
@@ -1040,18 +1058,18 @@ for(int i = 1; i < 12; i = i + 3){
 				\includegraphics[scale=0.8]{LoopData.pdf}
 			\end{figure}
 			
-			Given these data structures, new memory accesses are processed as described in Algorithm \ref{new-memory-acc}, and loop iteration endings are described in Algorithm \ref{new-loop-iteration}.
+			Given these data structures, new memory accesses are processed as described in Algorithm \ref{new-memory-acc}, loop iteration endings are described in Algorithm \ref{new-loop-iteration}, and loop termination is described in Algorithm \ref{loop-termination}.
 			
 			\begin{algorithm}
 				\caption{New memory accesses}\label{new-memory-acc}
 					When a memory location $m$ is accessed by instruction $i$, and LoopInstance $L$ is at the top of the loop stack,
 					\begin{enumerate}
-						\item If the memory location $m$ is in the write AddressSet of the pending table, but not the read AddressSet, then $m$ is killed, so do nothing, and skip the rest of the steps. 
+						\item If the memory location $m$ is killed by the pending table's AccessSet, do nothing, and skip the rest of the steps. 
 						\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride, and if so, its stride distance $d$. 
-						\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
-						\item If $m$ is a stride with stride distance $d$ then add it to the stride table.
-						\item If $m$ is not a stride, add it to the point table. 
-						\item Add the bytes accessed by $m$ to the AddressSet.
+						%\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
+						\item If $m$ is a stride with stride distance $d$ then add it to the appropriate stride table.
+						\item If $m$ is not a stride, add it to the appropriate point table. 
+						\item Add the bytes accessed by $m$ to the appropriate AddressSet.
 					\end{enumerate} 
 			\end{algorithm}
 			
@@ -1062,17 +1080,17 @@ for(int i = 1; i < 12; i = i + 3){
 				\begin{enumerate}
 					\item Merge pending table contents into history table
 					\begin{enumerate}
-						\item Add every point and stride in the point and stride tables in the pending table into the corresponding point and stride tables of the history table
+						\item Add every point and stride in the pending table into the corresponding point and stride tables of the history table
 						\item Union the pending AccessSets into the corresponding history AccessSets.
 						\item Clear the entire PendingTable.
 					\end{enumerate}
 					\item Check for conflicts between the pending and history tables
 					\begin{enumerate}
-						\item Determine if the iteration can be run in parallel by checking if the intersection of the pending table's read AccessSet and the history table's write AccessSet is $\emptyset$.
+						\item Determine if the iteration can be run in parallel by checking if the intersection of the pending table's read AccessSet and the history table's write AccessSet is empty.
 						\item If the loop iteration is not parallel, find the pairs of instructions that conflict by
 						\begin{enumerate}
-							\item Get the list of all points/strides in the read pending table, and compare it the list of all points/strides in the write history table, and find a list of overlapping points/stride intervals.
-							\item Filter out the intervals which are not actually conflicting.
+							\item Get the list of all points/strides in the read pending table, and compare it the list of all points/strides in the write history table, and find a list of pairs of overlapping points/strides.
+							\item Filter out the points/strides which are not actually conflicting.
 						\end{enumerate}
 					\end{enumerate}
 				\end{enumerate}
@@ -1082,19 +1100,76 @@ for(int i = 1; i < 12; i = i + 3){
 			\begin{algorithm}
 				\caption{Upon loop termination}\label{loop-termination}
 				
-				When loop $L$ terminates, with LoopInstance $I$ finishes, and Loop $L^\prime$ next on the LoopStack.
+				When loop $L$ terminates, with LoopInstance $I$ on the top of the LoopStack, and LoopInstance $I^\prime$ is the next highest on the stack,
 				\begin{enumerate}
-					\item Remove all strides and points from the history table of $L$ which are Killed by the pending table of $L^\prime$.
+					\item Remove all strides and points from the history table of $I$ which are killed by the pending table of $I^\prime$.
 					\item Merge history table contents into pending table.
+					\item Pop $I$ off the LoopStack.
 				\end{enumerate}
 			\end{algorithm}
 		
 		\section{Adding accesses}
 		
-		\subsection{StrideDetector}
-		\subsection{StrideTable}
-		\subsection{PointTable}
-		%\subsection{AccessSet}
+		
+		
+		\subsection{Stride Detection}
+		
+		The StrideDetector is implemented to match the original SD$^3$ design as closely as possible. The state machine matches Figure \ref{fig:stride-detector}.
+		
+		\subsection{Adding Points to the PointTable}
+		
+			Points (non-strided accesses) are added to the PointTable during new memory accesses and merges. The PointTable is designed so that redundant points are not duplicated in the table. 
+			
+			When a point is added to the table, it checks if there is a point with the same instr-addr, and mem-addr in the table.
+			
+			Recall that Points are specified by instruction address, memory address, and access mode (read or write). 
+			
+			When 
+			In Figure \ref{fig:point-table}, you can see that the a Point is stored for each instruction and memory address. 
+			
+			\begin{figure}[h]
+				\caption{Point Table}
+				\label{fig:point-table}
+				\includegraphics[scale=0.8]{point_data.pdf}
+			\end{figure}
+		
+			
+			%The data structures allow for a simple and efficient merge operation. The bit set is merged by an in-place union operation. For the point and stride tables, the operation simply calls \texttt{extract} to collect all the elements from the source table, and adds them one at a time to the destination table. 
+			
+			%The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. 
+			
+			
+		
+		\subsection{Adding Strides to the StrideTable}
+			
+			Strides also added to the StrideTable during new memory accesses and merges. 			
+			When possible, strides need to be merged into existing strides in the table when being added. This is critical for compression (see section \ref{sse:stride-descr}.5). The data structure is designed to make this process simple and efficient. 
+			
+			The StrideTable is a unordered set of ordered sets of strides. The outside set holds sets of strides which are all mergeable. As shown in Figure \ref{fig:stride-table}, the outer set is k  The inside set (which is ordered by the first element) holds strides which are 
+			
+			Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stride-table}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
+			
+			\begin{figure}[h]
+				\caption{Stride Table}
+				\label{fig:stride-table}
+				\includegraphics[scale=0.8]{stride_data.pdf}
+			\end{figure}
+		
+			These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree. However, since overlapping strides are always merged, there will never be overlapping strides. This property will be used to guarantee efficiency.
+			
+			
+			To see how this can be done, consider the below example, where there are 3 strides in the table, and one stride being added. Each grey block represents one stride: the added stride is six times longer than the other 3. The first stride cannot be merged with the added stride, and the other two can. 
+			
+			\newcommand{\bcl}{\cellcolor{black!50}}
+			\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c| } 
+				\hline
+				Current strides & \bcl &  & & \bcl & & &  & \bcl & \\ 
+				\hline
+				Added stride &  & & \multicolumn{5}{|c|}{\bcl} & & \\ 
+				\hline
+			\end{tabular}
+			
+			Since strides in the table will never overlap, the stride directly below the added stride is the only possible stride that starts before it, and also could overlap. In the example, it only has to check the one stride shown on the left. Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
 		
 		\section{Checking conflicts}
 		
@@ -1106,18 +1181,21 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsection{Killed bits}
 			
-		\subsection{Bit set implementation}
-		
+		\subsection{AccessSet implementation}
+			
+			The AccessSet stores a set of memory addresses. Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
+			
+			\begin{figure}[H]
+				\caption{Bitset data structure}
+				\label{fig:bitset}
+				\includegraphics[scale=0.8]{bit_data.pdf}
+			\end{figure}
+			
 			The Bit table stores a set of overall memory accesses, independently of the instruction it was accessed.
 			This is in contrast to Point and Stride tables, which store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information for performance reasons. In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
 			
 			%Points and strides store which instruction accessed them. But some operations do not need that information, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
 			
-			\begin{figure}[h]
-				\caption{Bitset data structure}
-				\label{fig:bitset}
-			\includegraphics[scale=0.8]{bit_data.pdf}
-			\end{figure}
 		
 			Each of these operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection as a representative example. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the boolean logical operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the \texttt{\&} operator. Set intersection is implemented in the bit-set described above by treating the outer set as a sparse set, and the bit array as a dense set. See Algorithm \ref{bitsetintersect} for details. % going though each element of the source set, deleteing it is not in the destination set
 			
@@ -1158,63 +1236,6 @@ for(int i = 1; i < 12; i = i + 3){
 		\subsection{Merge}
 			The data structures which implement point and stride tables are optimized for efficient merging, instead of efficient conflict checking. They have two methods, an \texttt{add} method, which simply adds an item to the table, and an \texttt{extract} method, which gets all current items in the table.
 			
-			\begin{figure}[h]
-				\caption{Stride and Point Tables}
-				\label{fig:stridepoint}
-				\begin{minipage}{1.0\linewidth}
-					\begin{minipage}[u]{.5\linewidth}
-						\includegraphics[scale=0.8]{stride_data.pdf}
-					\end{minipage}%
-					\begin{minipage}[u]{.5\linewidth}
-						\includegraphics[scale=0.8]{point_data.pdf}
-					\end{minipage}
-				\end{minipage}
-			\end{figure}
-		
-			The data structures allow for a simple and efficient merge operation. The bit set is merged by an in-place union operation. For the point and stride tables, the operation simply calls \texttt{extract} to collect all the elements from the source table, and adds them one at a time to the destination table. 
-			
-			
-			The add operation is the only non-trivial operation. For points, it is straightforward: add the point if it is not yet there. This works because a point's location in the table uniquely specifies its value. %Points are specified by instruction address, memory address, and access mode (read or write).
-			
-			For strides it is somewhat more complex, since strides need to be merged for efficiency reasons (see section \ref{sse:stride-descr}.5). But the data structure makes this process simple. Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stridepoint}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
-			
-			These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree. However, since overlapping strides are always merged, there will never be overlapping strides. This property will be used to guarantee efficiency.
-			
-			
-			To see how this can be done, consider the below example, where there are 3 strides in the table, and one stride being added. Each grey block represents one stride: the added stride is six times longer than the other 3. The first stride cannot be merged with the added stride, and the other two can. 
-			
-			\newcommand{\bcl}{\cellcolor{black!50}}
-			\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c| } 
-				\hline
-				Current strides & \bcl &  & & \bcl & & &  & \bcl & \\ 
-				\hline
-				Added stride &  & & \multicolumn{5}{|c|}{\bcl} & & \\ 
-				\hline
-			\end{tabular}
-			
-			Since strides in the table will never overlap, the stride directly below the added stride is the only possible stride that starts before it, and also could overlap. In the example, it only has to check the one stride shown on the left. Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
-			
-			
-%			\begin{algorithm}
-%				\caption{MassiveParrelelSum}\label{parellelsum}
-%				\begin{algorithmic}[1]
-%					\Function{RecursiveSum}{A,s,e}
-%					\If {$e - s \le 2$}
-%					\Return {$\textsc{StandardSum}(A[s:e])$}
-%					\EndIf
-%					\State $m \gets \floor{e-s}$
-%					\State $s_1 \gets \textsc{RecursiveSum}(A,s,m)$
-%					\State $s_2 \gets \textsc{RecursiveSum}(A,m,e)$
-%					\State \Return $s_1+s_2$
-%					\EndFunction
-%					\Function{StandardSum}{A}
-%					\State $s \gets 0$
-%					\For{$a \in A$}
-%					\State $s \gets s + a$
-%					\EndFor
-%					\EndFunction
-%				\end{algorithmic}
-%			\end{algorithm}
 %			
 		\subsection{Conflict Check}
 
