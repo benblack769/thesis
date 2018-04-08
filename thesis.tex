@@ -928,9 +928,9 @@ for(int i = 1; i < 12; i = i + 3){
 		\subsubsection{Predictability of memory accesses}
 		
 		
-		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from low latency, and stall the instruction pipeline. 
+		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from high latency, and stall the instruction pipeline. 
 		%[CITATION???] possibly file:///C:/Users/weepi/Documents/thesis/papers/CCWS.pdf 
-		CPUs are much better at handling unpredictable memory, since they have much larger caches. % also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
+		In contrast, CPUs are much better at handling unpredictable memory, since they have much larger caches. % also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
 		
 		We chose to capture this performance difference by measuring the number and length of strided accesses. 
 		We use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). 
@@ -986,23 +986,23 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		We chose metrics based on the main differences between CPUs and GPUs. 
 		
-		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
+		\begin{tabular}{ |p{6cm}|p{7cm}| }
 			\hline
 			Metric & Relevant hardware characteristic(s) \\
 			\hline \hline
-			Number of iterations per loop instance & Scale of Parallelism \\
+			Number of iterations & Scale of Parallelism \\
 			\hline
-			Length of loop iterations by instruction count & Scale of Parallelism \\
+			Instruction count of loop iterations  & Scale of Parallelism \\
 			\hline
 			Number of writes/reads & ??? \\
 			\hline
-			Bytes accessed per instance & ??? \\
+			Bytes accessed per instance & Memory??? \\
 			\hline
-			Total memory footprint of loop & Compare with Bytes for temporal locality?  \\
+			Total memory footprint of loop & Memory???  \\
 			\hline
-			Shared memory footprint between loop iterations & Cross-thread spacial locality \\
+			Shared memory footprint between loop iterations & Memory??? \\
 			\hline
-			Strided accesses  & Latency vs bandwidth \\
+			Strided accesses  & Latency vs. bandwidth \\
 			\hline
 			Number of branch changes & Warp divergence and branch prediction \\
 			\hline
@@ -1036,17 +1036,20 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsubsection{Rodinia}
 		
-		Rodina is a benchmark designed to compare CPU and GPU performance on different applications. The Rodinia applications are chosen to reflect the Berkley 7 dwarves of scientific computation. \footnote{\cite{Che:2009}}
+		Rodina is a benchmark designed to compare CPU and GPU performance on different applications. The Rodinia applications are chosen to reflect the Berkley 7 dwarves of scientific computation. \footnote{\cite{Che:2009}} All of these applications are parallelizable to some degree, and most of them are effective on GPUs. 
+		
+%		Colella, Phillip. Defining software requirements for scientific computing. Slide of 2004 presentation
+%		included in David Patterson’s 2005 talk, 2004. URL http://www.lanl.gov/orgs/
+%		hpc/salishan/salishan2005/davidpatterson.pdf.
+%		\footnote{\cite{Che:2010}}
+		
+		For each algorithm, Rodinia has a CPU implementation threaded using OpenMP. Since our tool does not support multithreaded applications, we removed the OpenMP compilation flag, and removed calls to the OpenMP library such as \texttt{omp\_get\_thread\_num}. 
 		
 		\subsubsection{Parsec}
 		
-		\footnote{\cite{Bienia:2008}}
+		Parsec is a benchmark for multi-threaded applications on CPUs.\footnote{\cite{Bienia:2008}} It has a more diverse range of applications than Rodinia, including computer vision and textual analysis as well as traditional scientific computing applications.
 		
-		Colella, Phillip. Defining software requirements for scientific computing. Slide of 2004 presentation
-		included in David Patterson’s 2005 talk, 2004. URL http://www.lanl.gov/orgs/
-		hpc/salishan/salishan2005/davidpatterson.pdf.
-		\footnote{\cite{Che:2010}}
-		
+		Parsec was more difficult to get running on our system. There were some applications which were incompatible with C++11, and so they did not compile, others which could not be single threaded without substantially changing the structure of the code, and so they could not be run on our analysis tools.  
 		
 		
 	\section{Stride Compression Implementation}
