@@ -1054,18 +1054,40 @@ for(int i = 1; i < 12; i = i + 3){
 		
 	\section{Bit Compression Implementation}
 	
-		Strides introduce all sorts of additional complexity and performance issues, and it does not guarantee good compression on all workloads. Bit compression (introduced in Section \ref{s:bit-compress}) promises to be the basis of a much simpler, faster compression system with less reliance on program characteristics. 
+		Strides introduce all sorts of additional complexity and performance issues, and it does not guarantee good compression on all workloads. Bit compression (introduced in Section \ref{s:bit-compress}) promises to be the basis of a much simpler, faster compression system with less reliance on program specific characteristics. 
 		
 		\subsection{Main data structure}
 		
-		For each 
+		Each pending and history table is two CompressedTables, one for reads and one for writes. Similar to the bit compressed set described in section \ref{s:access-set}, the table splits the address set into fixed width blocks (see Figure \ref{fig:bit-data}). When a piece of memory is first accessed block of memory is accessed 
+		%If a particular block of memory is never accessesed, then nothing representing that block is never put in the set. 
+		
+		All information about that block of memory is stored in a BlockInfo object, which is shown in Figure \ref{fig:block-info-data}. BlockInfo stores two thing: a set of overall memory accesses in the block (a BlockSet), and a map of instruction addresses to the accesses performed by that instruction in that block. Only instructions which access something in the block are stored.
 		
 		\begin{figure}[h]
-			\caption{BlockLabel}
+			\caption{CompressedTable}
 			\label{fig:bit-data}
-			\includegraphics[scale=0.8]{bitCompresslabeled.pdf}
+			\includegraphics[scale=1.0]{bit-data-structure.pdf}
 		\end{figure}
 		
+		
+		\begin{figure}[h]
+			\caption{BlockInfo}
+			\label{fig:block-info-data}
+			\includegraphics[scale=0.8]{bitCompresslabeled.pdf}
+		\end{figure}
+	
+		\subsection{Adding new memory}
+		
+			
+		
+		\subsection{Conflict-check}
+		
+			
+	
+		\subsection{Merge}
+	
+			
+			
 	
 	\section{Stride Compression Implementation}
 	
@@ -1091,7 +1113,7 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			These data structures store the content of the pending and history tables, but reads and writes are stored separately. See Figure \ref{fig:loopinstance} for how these tables fit inside the LoopInstance. 
 			
-			\begin{figure}[h]
+			\begin{figure}[H]
 				\caption{LoopInstance Layout}
 				\label{fig:loopinstance}
 				\includegraphics[scale=0.8]{LoopData.pdf}
@@ -1212,6 +1234,14 @@ for(int i = 1; i < 12; i = i + 3){
 			%These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree.
 		
 		\section{Checking conflicts}
+			
+			In SD$^3$, there is a single procedure that evaluates memory conflicts. We broke CONFLICT-CHECK into two procedures for performance reasons. The first procedure, IsParallel, is a fast operation that simply checks the intersection of the bit sets of the reads of the pending table and the writes of the history table. It gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory by looking at points and strides. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures. 
+			
+			\begin{figure}
+				\caption{Conflict-Check outline}
+				\label{fig:conflict-check}
+				\includegraphics[scale=0.8]{conflict-diagram.pdf}
+			\end{figure}
 		
 		\subsection{IsParrelel}
 		\subsection{Find Overlapping}
@@ -1220,8 +1250,9 @@ for(int i = 1; i < 12; i = i + 3){
 		\section{Merge}
 		
 		\subsection{Killed bits}
+		\subsection{Merging tables}
 			
-		\subsection{AccessSet implementation}
+		\section{AccessSet implementation}\label{s:access-set}
 			
 			The AccessSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
 			
@@ -1282,14 +1313,6 @@ for(int i = 1; i < 12; i = i + 3){
 %			
 		\subsection{Conflict Check}
 
-			In SD$^3$, there is a single procedure that evaluates memory conflicts. We broke CONFLICT-CHECK into two procedures for performance reasons. The first procedure, IsParallel, is a fast operation that simply checks the intersection of the bit sets of the reads of the pending table and the writes of the history table. It gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory by looking at points and strides. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures. 
-			
-			\begin{figure}
-				\caption{Conflict-Check outline}
-				\label{fig:conflict-check}
-				\includegraphics[scale=0.8]{conflict-diagram.pdf}
-			\end{figure}
-			
 			
 			Now, how does FindConflictingInstructions actually work? Similarly to SD$^3$, it is broken up into two steps. First, lists of strides and points are gathered by using \texttt{extract}. Then, these strides and points are treated as intervals, and the intervals that overlap are found in FindOverlapping. Finally, whether the strides and points actually overlap is calculated in FilterConflicting.
 			
