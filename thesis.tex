@@ -1119,58 +1119,59 @@ for(int i = 1; i < 12; i = i + 3){
 				\includegraphics[scale=0.8]{LoopData.pdf}
 			\end{figure}
 			
-			Given these data structures, new memory accesses are processed as described in Algorithm \ref{new-memory-acc}, loop iteration endings are described in Algorithm \ref{new-loop-iteration}, and loop termination is described in Algorithm \ref{loop-termination}.
+			%Given these data structures, new memory accesses are processed as described in Algorithm \ref{new-memory-acc}, loop iteration endings are described in Algorithm \ref{new-loop-iteration}, and loop termination is described in Algorithm \ref{loop-termination}.
 			
-			\begin{algorithm}
-				\caption{New memory accesses}\label{new-memory-acc}
-					When a memory location $m$ is accessed by instruction $i$, and LoopInstance $L$ is at the top of the loop stack,
-					\begin{enumerate}
-						\item If the memory location $m$ is killed by the pending table's AccessSet, do nothing, and skip the rest of the steps. 
-						\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride, and if so, its stride distance $d$. 
-						%\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
-						\item If $m$ is a stride with stride distance $d$ then add it to the appropriate stride table.
-						\item If $m$ is not a stride, add it to the appropriate point table. 
-						\item Add the bytes accessed by $m$ to the appropriate AddressSet.
-					\end{enumerate} 
-			\end{algorithm}
-			
-			
-			\begin{algorithm}
-				\caption{Finishing a loop iteration}\label{new-loop-iteration}
-				When an iteration of loop $L$, with LoopInstance $I$ finishes,
-				\begin{enumerate}
-					\item Merge pending table contents into history table
-					\begin{enumerate}
-						\item Add every point and stride in the pending table into the corresponding point and stride tables of the history table
-						\item Union the pending AccessSets into the corresponding history AccessSets.
-						\item Clear the entire PendingTable.
-					\end{enumerate}
-					\item Check for conflicts between the pending and history tables
-					\begin{enumerate}
-						\item Determine if the iteration can be run in parallel by checking if the intersection of the pending table's read AccessSet and the history table's write AccessSet is empty.
-						\item If the loop iteration is not parallel, find the pairs of instructions that conflict by
-						\begin{enumerate}
-							\item Get the list of all points/strides in the read pending table, and compare it the list of all points/strides in the write history table, and find a list of pairs of overlapping points/strides.
-							\item Filter out the points/strides which are not actually conflicting.
-						\end{enumerate}
-					\end{enumerate}
-				\end{enumerate}
-			\end{algorithm}
+%			
+%			\begin{algorithm}
+%				\caption{Finishing a loop iteration}\label{new-loop-iteration}
+%				When an iteration of loop $L$, with LoopInstance $I$ finishes,
+%				\begin{enumerate}
+%					\item Merge pending table contents into history table
+%					\begin{enumerate}
+%						\item Add every point and stride in the pending table into the corresponding point and stride tables of the history table
+%						\item Union the pending AccessSets into the corresponding history AccessSets.
+%						\item Clear the entire PendingTable.
+%					\end{enumerate}
+%					\item Check for conflicts between the pending and history tables
+%					\begin{enumerate}
+%						\item Determine if the iteration can be run in parallel by checking the AccessSets. if the intersection of the pending table's read AccessSet and the history table's write AccessSet is empty.
+%						\item If the loop iteration is not parallel, find the pairs of instructions that conflict by
+%						\begin{enumerate}
+%							\item Get the list of all points/strides in the read pending table, and compare it the list of all points/strides in the write history table, and find a list of pairs of overlapping points/strides.
+%							\item Filter out the points/strides which are not actually conflicting.
+%						\end{enumerate}
+%					\end{enumerate}
+%				\end{enumerate}
+%			\end{algorithm}
 
-
-			\begin{algorithm}
-				\caption{Upon loop termination}\label{loop-termination}
-				
-				When loop $L$ terminates, with LoopInstance $I$ on the top of the LoopStack, and LoopInstance $I^\prime$ is the next highest on the stack,
-				\begin{enumerate}
-					\item Remove all strides and points from the history table of $I$ which are killed by the pending table of $I^\prime$.
-					\item Merge history table contents into pending table.
-					\item Pop $I$ off the LoopStack.
-				\end{enumerate}
-			\end{algorithm}
+%
+%			\begin{algorithm}
+%				\caption{Upon loop termination}\label{loop-termination}
+%				
+%				When loop $L$ terminates, with LoopInstance $I$ on the top of the LoopStack, and LoopInstance $I^\prime$ is the next highest on the stack,
+%				\begin{enumerate}
+%					\item Remove all strides and points from the history table of $I$ which are killed by the pending table of $I^\prime$.
+%					\item Merge history table contents into pending table.
+%					\item Pop $I$ off the LoopStack.
+%				\end{enumerate}
+%			\end{algorithm}
+%		
+		\section{Adding accesses}\label{s:add-accesses}
 		
-		\section{Adding accesses}
+		Algorithm \ref{new-memory-acc} describes the high level description of how new memory accesses are put in the pending table. % a lot of details out. These details will be explained here. 
 		
+		\begin{algorithm}
+			\caption{New memory accesses}\label{new-memory-acc}
+			When a memory location $m$ is accessed by instruction $i$, and LoopInstance $L$ is at the top of the loop stack,
+			\begin{enumerate}
+				\item If the memory location $m$ is killed by the pending table's AccessSet, do nothing, and skip the rest of the steps. 
+				\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride, and if so, its stride distance $d$. 
+				%\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
+				\item If $m$ is a stride with stride distance $d$ then add it to the appropriate stride table.
+				\item If $m$ is not a stride, add it to the appropriate point table. 
+				\item Add the bytes accessed by $m$ to the appropriate AddressSet.
+			\end{enumerate} 
+		\end{algorithm}
 		
 		
 		\subsection{Stride Detection}
@@ -1240,18 +1241,85 @@ for(int i = 1; i < 12; i = i + 3){
 			\begin{figure}
 				\caption{Conflict-Check outline}
 				\label{fig:conflict-check}
-				\includegraphics[scale=0.8]{conflict-diagram.pdf}
+				\includegraphics[scale=1.0]{conflict-diagram.pdf}
 			\end{figure}
 		
-		\subsection{IsParrelel}
+		
+		\subsection{Truncation of FindConflictingInstructions}
+
+			To ensure efficiency, FindConflictingInstructions cannot be run too many times whether the loop is has conflicts or not. 
+			
+			\begin{enumerate}
+				\item If the loop iteration does not have any conflicts (discovered by running IsParallel), then we know that no instructions have conflicts, so we do not need to check them. 
+				\item If the loop does have conflicts, then the same conflicts most likely occur in many other loop iterations. So after we have found the locations of conflicts in some constant number of loop iterations, we can simply not check later iterations. The information reported may be incomplete, but it will have always have some conflicts reported. 
+				%The conflicting instructions are simply guides to the programmer. As such they do not have to be 100\% accurate. In particular, if there are some instruction conflicts which are reported, and others which are not, this is not a serious problem. So this information can be truncated.  
+			\end{enumerate}
+		
+			Together, these 
+			
+			Because FindConflictingInstructions is a slow operation, it should be run as infrequently as possible to collect the information we need. Our method only runs it a constant number of times for a particular loop instance. This is made possible by two observations:
+			%more than a constant number of times in a loop 
+		
+		\subsection{IsParallel}
+		
+			The AccessSet makes this operation very easy. The intersection of the history write set and the pending read set is checked. The loop iteration is parallel if and only if that intersection is empty. 
+		
 		\subsection{Find Overlapping}
+			Now, how does FindConflictingInstructions actually work? Similarly to SD$^3$, it is broken up into two steps. First, lists of strides and points are gathered by using \texttt{extract}. Then, these strides and points are treated as intervals, and the intervals that overlap are found in FindOverlapping. Finally, whether the strides and points actually overlap is calculated in FilterConflicting.
+		
+		
+			FindOverlapping uses a sliding window technique on sorted lists of intervals to compute a list of pairs of overlapping intervals. Call these lists A and B. The algorithm first sorts the two lists of intervals by their start. It considers each interval from A one at a time, call this interval $I$. It keeps a window of intervals of list B which overlap the start of $I$. Each time another interval from A is checked, the algorithm it drops the intervals which end before the new interval starts, and adds in all the intervals which start before the new interval starts, but end after it starts. Then it finds the intervals from B which start after $I$ starts, but before $I$ ends. Algorithm \ref{algo:findoverlapping} has psuedocode for this algorithm.
+                        
+\begin{algorithm}
+    \caption{Find Overlapping}
+    \label{algo:findoverlapping}
+\begin{verbatim}
+find_overlapping_intervals(A,B)
+    sort A by first()
+    sort B by first()
+    overlap = Set()
+    before_last = vector()
+    ib = 0
+    for interval in A
+        new_before_last = vector()
+        for item in before_last:
+            if item.last() >= interval.first():
+                new_before_last.append(item)
+        swap(before_last,new_before_last)
+
+        increment ib until B[ib].first() >= interval.first()
+        
+        if B[ib].last() >= interval.first()
+            before_last.append(B[ib])
+
+        for bl in before_last
+            overlap.add(bl,interval)
+
+        for ib2 from ib until B[ib2].first() > interval.last()
+            overlap.add(B[ib2],interval)
+\end{verbatim}
+\end{algorithm}
+		
+		
 		\subsection{Filter Non-conflicting}
 		
-		\section{Merge}
-		
-		\subsection{Killed bits}
-		\subsection{Merging tables}
+			Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm. We found it difficult to work out the details of this algorithm, so instead, we decided to use other methods. In particular, the vast majority of strided conflicts will be much easier to check. Many strides will be dense, every byte in between the start and end will be accessed. Many other possible conflicting strides will have the same stride distance. And most of the remaining strides will have long interval overlap compared to the stride distance, which means that the ordinary GCD test gives the correct answer.
+			Our method simply checks if these cases apply, and if so, calculates the answer. The few remaining cases can be checked with a slow algorithm which compares the strides element by element.
+			 
+			%In particular, it is important to note that having constant time comparison is not needed for algorithmic efficiency of the method. After all, each element of the stride is added one at a time, and it is only compari
 			
+		\section{Loop termination}
+		
+			When a loop terminates, and it is not the outermost active loop, then it must be merged into its parent loop. Each Point and Stride is extracted from the outer loop's history table, and unless it is killed, it is added to the inner loop's pending table using the add method described in Section \ref{s:add-accesses}. 
+		
+		\subsection{Killing}
+		
+			
+			The SD$^3$ algorithm subtracts killed points and strides by a similar algorithm to their conflict-check method. We used the bit sets to do this instead. After all, killed bits are most easily described using the bit sets. We simply used the bit sets to check whether points and strides were killed or not one at a time. To guarantee runtime efficiency, the elements of a stride are checked one at a time, starting from the front of the stride, and one at a time. This process terminates at the first stride element that is not killed. 
+%			
+%			AccessSets are first killed with set subtraction, and then unioned into the appropriate set. 
+%			Stride and Point tables are merged by simply extracting every Point or Stride from the source table, and adding them one at a time into the destination table using the add method . 
+%			
 		\section{AccessSet implementation}\label{s:access-set}
 			
 			The AccessSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
@@ -1307,95 +1375,7 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			%\includegraphics[scale=0.6]{FullLoopData.pdf}
 			
-		\subsection{Merge}
-			The data structures which implement point and stride tables are optimized for efficient merging, instead of efficient conflict checking. They have two methods, an \texttt{add} method, which simply adds an item to the table, and an \texttt{extract} method, which gets all current items in the table.
 			
-%			
-		\subsection{Conflict Check}
-
-			
-			Now, how does FindConflictingInstructions actually work? Similarly to SD$^3$, it is broken up into two steps. First, lists of strides and points are gathered by using \texttt{extract}. Then, these strides and points are treated as intervals, and the intervals that overlap are found in FindOverlapping. Finally, whether the strides and points actually overlap is calculated in FilterConflicting.
-			
-			\subsubsection{Find Overlapping}
-				
-				FindOverlapping uses a sliding window technique on sorted lists of intervals to compute a list of pairs of overlapping intervals. Call these lists A and B. The algorithm first sorts the two lists of intervals by their start. It considers each interval from A one at a time, call this interval $I$. It keeps a window of intervals of list B which overlap the start of $I$. Each time another interval from A is checked, the algorithm it drops the intervals which end before the new interval starts, and adds in all the intervals which start before the new interval starts, but end after it starts. Then it finds the intervals from B which start after $I$ starts, but before $I$ ends. Algorithm \ref{algo:findoverlapping} has psuedocode for this algorithm.
-				
-				\begin{algorithm}
-					\caption{Find Overlapping}
-					\label{algo:findoverlapping}
-				\begin{verbatim}
-				find_overlapping_intervals(A,B)
-				    sort A by first()
-				    sort B by first()
-				    overlap = Set()
-				    before_last = vector()
-				    ib = 0
-				    for interval in A
-				        new_before_last = vector()
-				        for item in before_last:
-				            if item.last() >= interval.first():
-				                new_before_last.append(item)
-				        swap(before_last,new_before_last)
-				
-				        increment ib until B[ib].first() >= interval.first()
-				        
-				        if B[ib].last() >= interval.first()
-				            before_last.append(B[ib])
-				
-				        for bl in before_last
-				            overlap.add(bl,interval)
-				
-				        for ib2 from ib until B[ib2].first() > interval.last()
-				            overlap.add(B[ib2],interval)
-				\end{verbatim}
-				\end{algorithm}
-			
-			\subsubsection{Filter Conflicting}
-		
-				Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm. We found it difficult to work out the details of this algorithm, so instead, we decided to use other methods. In particular, the vast majority of strided conflicts will be much easier to check. Many strides will be dense, every byte in between the start and end will be accessed. Many other possible conflicting strides will have the same stride distance. And most of the remaining strides will have long interval overlap compared to the stride distance, which means that the ordinary GCD test gives the correct answer.
-				Our method simply checks if these cases apply, and if so, calculates the answer. The few remaining cases can be checked with a slow algorithm which compares the strides element by element.
-				 
-				%In particular, it is important to note that having constant time comparison is not needed for algorithmic efficiency of the method. After all, each element of the stride is added one at a time, and it is only compari
-				
-			%Instead of using interval trees, we used data structures optimized towards merging strides and points. Points can only be merged if their instruction and memory address is the same, so they are stored by instruction and memory address. 
-			
-			\subsubsection{Truncated execution of FindConflictingInstructions}
-			
-			Because FindConflictingInstructions is a slow operation, it should be run as infrequently as possible to collect the information we need. Our method only runs it a constant number of times for a particular loop instance. This is made possible by two observations:
-			
-			\begin{enumerate}
-				\item If the loop iteration does not have any conflicts (discovered by running IsParallel), then we know that no instructions have conflicts, so we do not need to check them. 
-				\item  The conflicting instructions are simply guides to the programmer. As such they do not have to be 100\% accurate. In particular, if there are some instruction conflicts which are reported, and others which are not, this is not a serious problem. So this information can be truncated.  
-			\end{enumerate}
-			
-			These two observations give rise to the following procedure, which ensures that the FindConflictingInstructions() is only run a constant number of times:
-			
-			\begin{algorithm}
-				\caption{CONFLICT-CHECK}
-				\label{conflict-check}
-				\begin{algorithmic}[1]
-					%\Function{RecursiveSum}{A,s,e}
-					\If {$\textsc{IsParallel(H,P)}$}
-					\State Report parallel iteration 
-					\ElsIf{ConflictingIters $>$ TRUNCATE-OUTPUT-ITERS}
-					\State Report not parallel iteration 
-					\Else
-					\State InstrInfo = $\textsc{FindConflictingInstructions(H,P)}$
-					\State ConflictingIters \texttt{+=} 1
-					\State Report not parallel iteration with conflicts: InstrInfo
-					\EndIf
-				\end{algorithmic}
-			\end{algorithm}
-		
-		\subsection{Subtract Killed}
-			
-			The SD$^3$ algorithm subtracts killed points and strides by a similar algorithm to their conflict-check method. We used the bit sets to do this instead. After all, killed bits are most easily described using the bit sets. We simply used the bit sets to check whether points and strides were killed or not one at a time. To guarantee runtime efficiency, the elements of a stride are checked one at a time, starting from the front of the stride, and one at a time. This process terminates at the first stride element that is not killed. 
-		
-		
-	\section{Bit Compression Implementation}
-	
-		
-	
 	\chapter{Results}
 	
 	\section{Intro}
