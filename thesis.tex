@@ -894,8 +894,14 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsection{Implementation of a bit compressed integer set}	
 		
-		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set will be implemented by a hash table where each item represents a fixed size set of memory. 
+		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set will be implemented by a hash table where each item represents a fixed size set of memory. Figure \ref{fig:bit-local-density} shows the the three different types of sets storing the same information. %the difference between what information the three types of sets store. 
 		
+		
+		\begin{figure}[H]
+			\caption{Table comparisons}
+			\label{fig:bit-local-density}
+			\includegraphics[scale=0.8]{BitSetComparison.pdf}
+		\end{figure}
 		
 		
 		
@@ -947,7 +953,7 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsubsection{Inter-thread vs Intra-thread memory sharing}
 		
-		CPUs theads have much larger cache capacity than GPU threads, since there are simply many more GPU threads active at a given time. \footnote{\cite{Jia:6835938}} This means that GPU threads cannot rely on caches to exploit temporal locality to the same degree that CPU threads can. Instead, GPU caches effectively exploit cross-thread locality. 
+		CPUs theads have much larger cache capacity than GPU threads, since there are simply many more GPU threads active at a given time.\footnote{\cite{Jia:6835938}} This means that GPU threads cannot rely on caches to exploit temporal locality to the same degree that CPU threads can. Instead, GPU caches effectively exploit cross-thread locality. 
 		
 		To capture this, we measure the amount of memory shared between loop iterations vs reaccessed within a single iteration.
 		We construct maps of the memory footprint of the loop and each of its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iteration as well whole instance. %From that, the number of shared bytes between threads 
@@ -1124,7 +1130,7 @@ for(int i = 1; i < 12; i = i + 3){
 %				\end{enumerate}
 %			\end{algorithm}
 %		
-		\section{Adding accesses}\label{s:add-accesses}
+		\subsection{Adding accesses}\label{s:add-accesses}
 		
 		Algorithm \ref{new-memory-acc} describes the high level description of how new memory accesses are put in the pending table. % a lot of details out. These details will be explained here. 
 		
@@ -1142,11 +1148,11 @@ for(int i = 1; i < 12; i = i + 3){
 		\end{algorithm}
 		
 		
-		\subsection{Stride Detection}
+		\subsubsection{Stride Detection}
 		
 		The StrideDetector is implemented to match the original SD$^3$ design as closely as possible. The state machine matches Figure \ref{fig:stride-detector}.
 		
-		\subsection{Adding Points to the PointTable}
+		\subsubsection{Adding Points to the PointTable}
 		
 			Points (non-strided accesses) are added to the PointTable during new memory accesses and merges. The PointTable is designed so that redundant points are not duplicated in the table. 
 			
@@ -1167,12 +1173,12 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			
 		
-		\subsection{Adding Strides to the StrideTable}
+		\subsubsection{Adding Strides to the StrideTable}
 			
 			Strides also added to the StrideTable during new memory accesses and merges. 			
 			When possible, strides need to be merged into existing strides in the table when being added. This is critical for compression (see section \ref{sse:stride-descr}.5). The data structure is designed to make this process simple and efficient. 
 			
-			At a high level, the StrideTable is a unordered set of ordered sets of strides (see Figure \ref{fig:stride-table}). The outer set ensures that a particular inner set stores strides which are mergeable if they adjoin. The inner set is used to check if the strides do adjoin, in which case, they are mergeable.
+			At a high level, the StrideTable is a unordered set of ordered sets of strides (see Figure \ref{fig:stride-table}). The outer set ensures that a particular inner set contains only strides which are mergeable if they adjoin. The inner ordered set is used to check if the strides do adjoin, in which case, they are mergeable.
 			
 			\begin{figure}[h]
 				\caption{Stride Table}
@@ -1181,30 +1187,51 @@ for(int i = 1; i < 12; i = i + 3){
 			\end{figure}
 			 
 			
-			As shown in Figure \ref{fig:stride-table}, the outer set is keyed on the instruction address, the stride distance, and the stride start modulo the stride distance. Strides which have these criteria in common are mergable if they adjoin, since These criteria ensure that all the strides in the inside set of strides which are all mergeable. 
+			As shown in Figure \ref{fig:stride-table}, the outer set is keyed on the instruction address, the stride distance, and the stride start modulo the stride distance. Strides which have these criteria in common are mergeable if they adjoin.  This is best explained with examples:
 			
-			The inside set is ordered by the first element in the stride. Overlapping strides are always merged, there will never be overlapping strides in the set. This property will be used to guarantee efficiency.
+			\begin{tabular}{ |c||c|c|c| } 
+				\hline
+				Stride \# & Stride Distance & Stride start & Stride last \\ 
+				\hline
+				\hline
+				1 & 2 & 4 & 8 \\ 
+				2 & 3 & 4 & 13 \\ 
+				3 & 2  & 5  & 9 \\ 
+				4 & 2  & 0  & 2 \\ 
+				\hline
+			\end{tabular}
+		
+			In the table above, stride 1 and 4 are mergeable, while no other pair of strides are. It should be clear that stride 2, with a different stride distance from the rest, will not be mergeable with the others except in edge cases. Stride 3 is not mergeable because the elements don't not match up with the other strides. In contrast, stride 1 and 4 seem to almost be the same stride, in that if their boundaries are extended, they could become the same stride. It turns out that this idea of boundary extension is captured perfectly with the stride start modulo the stride distance. 
+			% These criteria ensure that all the strides in the inside set of strides which are all mergeable. 
 			
-			To see how this can be done, consider the below example, where there are 3 strides in the table, and one stride being added. Each grey block represents one stride: the added stride is six times longer than the other 3. The first stride cannot be merged with the added stride, and the other two can. 
+			Now, the inside set needs to merge all adjoining strides. This problem is exactly the problem of merging of overlapping intervals, which is already well understood. But to be complete, a solution outline will be detailed here. % union of intervals, and is a much more well known pronl
+			
+			The inside set is ordered by the first element in the interval (which just happens to be a stride). Overlapping intervals are always merged, there will never be overlapping intervals in the set. This property will be used to guarantee efficiency.
+			
+			To see how this can be done, consider the below example, where there are three intervals in the table, and one intervals being added. The first intervals cannot be merged with the added intervals, and the other two can. 
 			
 			\newcommand{\bcl}{\cellcolor{black!50}}
-			\begin{tabular}{ |c|c|c|c|c|c|c|c|c|c| } 
+			\begin{tabular}{ |l|l| } 
 				\hline
-				Current strides & \bcl &  & & \bcl & & &  & \bcl & \\ 
+				Current intervals & (1,3),(4,5),(7,9) \\ 
 				\hline
-				Added stride &  & & \multicolumn{5}{|c|}{\bcl} & & \\ 
+				Added interval & (4,6) \\ 
 				\hline
 			\end{tabular}
 			
-			Since strides in the table will never overlap, the stride directly below the added stride is the only possible stride that starts before it, and also could overlap. In the example, it only has to check the one stride shown on the left. Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
+			Since intervals in the table will never overlap, the interval directly below the added interval is the only possible interval that starts before it, and also could overlap. In the example, this is (1,3) interval. 
+			
+			The intervals above the added interval can be easily checked because their first element will be less than the added interval's last element. %Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
 			
 			%Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stride-table}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
 			%These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree.
 		
-		\section{Checking conflicts}
+		\subsection{Checking conflicts}
 			
-			In SD$^3$, there is a single procedure that evaluates memory conflicts. We broke CONFLICT-CHECK into two procedures for performance reasons. The first procedure, IsParallel, is a fast operation that simply checks the intersection of the bit sets of the reads of the pending table and the writes of the history table. It gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory by looking at points and strides. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures. 
+			In SD$^3$, there is a single procedure that evaluates memory conflicts. 
+			
+			We broke CONFLICT-CHECK into two procedures for performance reasons. The first procedure, IsParallel, is a fast operation that simply checks the intersection of the bit sets of the reads of the pending table and the writes of the history table. It gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory by looking at points and strides. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures. 
 			
 			\begin{figure}
 				\caption{Conflict-Check outline}
@@ -1213,7 +1240,7 @@ for(int i = 1; i < 12; i = i + 3){
 			\end{figure}
 		
 		
-		\subsection{Truncation of FindConflictingInstructions}
+		\subsubsection{Truncation of FindConflictingInstructions}
 
 			To ensure efficiency, FindConflictingInstructions cannot be run too many times whether the loop is has conflicts or not. 
 			
@@ -1228,11 +1255,11 @@ for(int i = 1; i < 12; i = i + 3){
 			Because FindConflictingInstructions is a slow operation, it should be run as infrequently as possible to collect the information we need. Our method only runs it a constant number of times for a particular loop instance. This is made possible by two observations:
 			%more than a constant number of times in a loop 
 		
-		\subsection{IsParallel}
+		\subsubsection{IsParallel}
 		
 			The AccessSet makes this operation very easy. The intersection of the history write set and the pending read set is checked. The loop iteration is parallel if and only if that intersection is empty. 
 		
-		\subsection{Find Overlapping}
+		\subsubsection{Find Overlapping}
 			Now, how does FindConflictingInstructions actually work? Similarly to SD$^3$, it is broken up into two steps. First, lists of strides and points are gathered by using \texttt{extract}. Then, these strides and points are treated as intervals, and the intervals that overlap are found in FindOverlapping. Finally, whether the strides and points actually overlap is calculated in FilterConflicting.
 		
 		
@@ -1269,18 +1296,18 @@ find_overlapping_intervals(A,B)
 \end{algorithm}
 		
 		
-		\subsection{Filter Non-conflicting}
+		\subsubsection{Filter Non-conflicting}
 		
 			Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm. We found it difficult to work out the details of this algorithm, so instead, we decided to use other methods. In particular, the vast majority of strided conflicts will be much easier to check. Many strides will be dense, every byte in between the start and end will be accessed. Many other possible conflicting strides will have the same stride distance. And most of the remaining strides will have long interval overlap compared to the stride distance, which means that the ordinary GCD test gives the correct answer.
 			Our method simply checks if these cases apply, and if so, calculates the answer. The few remaining cases can be checked with a slow algorithm which compares the strides element by element.
 			 
 			%In particular, it is important to note that having constant time comparison is not needed for algorithmic efficiency of the method. After all, each element of the stride is added one at a time, and it is only compari
 			
-		\section{Loop termination}
+		\subsection{Loop termination}
 		
 			When a loop terminates, and it is not the outermost active loop, then it must be merged into its parent loop. Each Point and Stride is extracted from the outer loop's history table, and unless it is killed, it is added to the inner loop's pending table using the add method described in Section \ref{s:add-accesses}. 
 		
-		\subsection{Killing}
+		\subsubsection{Killing}
 		
 			
 			The SD$^3$ algorithm subtracts killed points and strides by a similar algorithm to their conflict-check method. We used the bit sets to do this instead. After all, killed bits are most easily described using the bit sets. We simply used the bit sets to check whether points and strides were killed or not one at a time. To guarantee runtime efficiency, the elements of a stride are checked one at a time, starting from the front of the stride, and one at a time. This process terminates at the first stride element that is not killed. 
@@ -1288,7 +1315,7 @@ find_overlapping_intervals(A,B)
 %			AccessSets are first killed with set subtraction, and then unioned into the appropriate set. 
 %			Stride and Point tables are merged by simply extracting every Point or Stride from the source table, and adding them one at a time into the destination table using the add method . 
 %			
-		\section{AccessSet implementation}\label{s:access-set}
+		\subsection{AccessSet implementation}\label{s:access-set}
 			
 			The AccessSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
 			
@@ -1347,17 +1374,23 @@ find_overlapping_intervals(A,B)
 			
 			Stride compression introduces all sorts of additional complexity, creates performance issues, and it does not guarantee good compression on all workloads. Bit compression (introduced in Section \ref{s:bit-compress}) promises to be the basis of a much simpler, faster compression system with less reliance on program specific characteristics. 
 			
-			\subsection{Main data structure}
+			This approach may not have been suitable for Kim et. al.
+			%Unlike stride compression, it cannot even approximate
 			
-			Each pending and history table is divided into two tables, one for reads and one for writes. Similar to the bit compressed set described in section \ref{s:access-set}, the table splits the address set into fixed width blocks (see Figure \ref{fig:bit-data}). 
+			\subsection{Main ideas}
+			
+			Similar to the bit compressed set described in Section \ref{s:access-set}, the table splits the address space into fixed width blocks, and stores the accesses in that block if there are any (second row of Figure \ref{fig:bit-idea}). However, for each blocks it also stores a map of instructions to the data which that specific instruction stored (third row of Figure \ref{fig:bit-idea}). Call of the block information together a BlockInfo. Call a fixed length bit array a BlockSet. 
 			
 			\begin{figure}[h]
 				\caption{Overall idea}
-				\label{fig:bit-data}
+				\label{fig:bit-idea}
 				\includegraphics[scale=0.85]{BlockSet_accesses.pdf}
 			\end{figure}
 			
-			When a piece of memory is first accessed block of memory is accessed 
+			\subsection{Data structures}
+			
+			Each pending and history table is divided into two tables, one for reads and one for writes. The tabl
+			
 			%If a particular block of memory is never accessesed, then nothing representing that block is never put in the set. 
 			
 			All information about that block of memory is stored in a BlockInfo object, which is shown in Figure \ref{fig:block-info-data}. BlockInfo stores two thing: a set of overall memory accesses in the block (a BlockSet), and a map of instruction addresses to the accesses performed by that instruction in that block. Only instructions which access something in the block are stored.
@@ -1370,7 +1403,13 @@ find_overlapping_intervals(A,B)
 				\label{fig:bit-data}
 				\includegraphics[scale=1.0]{bit-data-structure.pdf}
 			\end{figure}
-			
+		
+			\begin{figure}[h]
+				\caption{BlockInfo}
+				\label{fig:bit-data}
+				\includegraphics[scale=1.0]{block-info.pdf}
+			\end{figure}
+						
 			
 			\begin{figure}[h]
 				\caption{BlockInfo}
@@ -1380,11 +1419,20 @@ find_overlapping_intervals(A,B)
 			
 			\subsection{Adding new memory}
 			
+			When a byte of memory is accessed by an instruction, then:
 			
+			\begin{enumerate}
+				\item If there is no BlockInfo that covers the address in the table, then add an empty one.
+				\item Add the byte to the union part of the BlockInfo.
+				\item If the instruction.
+			\end{enumerate}
+			
+			 the access is added to the BlockInfo, (the BlockInfo is put in the table if there is none there). 
+			%is put in the accessed block of memory is first accessed,
 			
 			\subsection{Conflict-check}
 			
-			
+			When 
 			
 			\subsection{Merge}
 			
