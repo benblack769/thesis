@@ -1473,37 +1473,50 @@ find_overlapping_intervals(A : interval list, B : interval list)
 	
 		\subsection{Running applications}
 		
+		Command line argument filesnames don't include the full path to the data file.
+		
 			\begin{tabular}{ |l|l|l| }
 				\hline
-				Application          & Suite   & Input  \\ \hline
+				Application          & Suite   & Command line arguments  \\ \hline
 				\hline
-				B+tree & Rodinia  &     \\ \hline
-				Back Propagation & Rodinia  &    \\ \hline
-				Breadth First Search & Rodinia  &    \\ \hline
-				CFD & Rodinia  &    \\ \hline
-				Heartwall & Rodinia  &   \\ \hline
-				Hotspot & Rodinia  &    \\ \hline
-				Hotspot3d & Rodinia  &    \\ \hline
-				kmeans & Rodinia  &     \\ \hline
-				lavaMD & Rodinia  &     \\ \hline
-				leukocyte & Rodinia  &     \\ \hline
-				LU Decomposition & Rodinia    &  \\ \hline
-				Myocite & Rodinia  &     \\ \hline
-				Nearest Neighbor & Rodinia  &     \\ \hline
-				Needleman-Wunsch & Rodinia  &     \\ \hline
-				ParticleFilter & Rodinia  &     \\ \hline
-				PathFinder & Rodinia  &     \\ \hline
-				SRAD & Rodinia  &     \\ \hline
-				StreamCluster & Rodinia  &    \\ \hline
+				B+tree & Rodinia  &  \texttt{b+tree.out core 2 file mil.txt command command.txt}  \\ \hline
+				Back Propagation & Rodinia  &  \texttt{backprop 655360} \\ \hline
+				Breadth First Search & Rodinia  &  \texttt{bfs 4 graph1MW\_6.txt}  \\ \hline
+				%CFD & Rodinia  &    \\ \hline
+				Heartwall & Rodinia  & \texttt{heartwall test.avi 5 4} \\ \hline
+				Hotspot & Rodinia  &   \texttt{hotspot 1024 1024 2 4 temp\_1024 power\_1024 output.out} \\ \hline
+				Hotspot3d & Rodinia  & \texttt{3D 512 8 100 power\_512x8 temp\_512x8 output.out}   \\ \hline
+				kmeans & Rodinia  &    \texttt{kmeans -i kdd\_cup} \\ \hline
+				lavaMD & Rodinia  &  \texttt{lavaMD -cores 4 -boxes1d 10}   \\ \hline
+				%leukocyte & Rodinia  &     \\ \hline
+				LU Decomposition & Rodinia    &  \texttt{lud\_omp -s 2000} \\ \hline
+				Myocite & Rodinia  &  \texttt{myocyte.out 100 1 0 4}  \\ \hline
+				Nearest Neighbor & Rodinia  &  \texttt{nn ./nn/filelist\_4 5 30 90}   \\ \hline
+				Needleman-Wunsch & Rodinia  & \texttt{needle 2048 10 2}    \\ \hline
+				ParticleFilter & Rodinia  &    \texttt{particle\_filter -x 128 -y 128 -z 10 -np 10000} \\ \hline
+				PathFinder & Rodinia  &  \texttt{pathfinder 100000 100}   \\ \hline
+				SRAD & Rodinia  &  \texttt{srad 2048 2048 0 127 0 127 2 0.5 2}   \\ \hline
+				StreamCluster & Rodinia  &    \texttt{sc\_omp 10 20 256 4096 4096 1000 none output.txt 4} \\ \hline
+				Black Scholes & Parsec  &  \texttt{blackscholes 1 in\_64K.txt prices.txt} \\ \hline
+				Canneal & Parsec  &  \texttt{canneal 1 15000 2000 400000.nets 128} \\ \hline
+				Facesim & Parsec  &  \texttt{facesim -timing -threads 1} \\ \hline
+				Fluidanimate & Parsec  &  \texttt{fluidanimate 1 5 in\_300K.fluid out.fluid} \\ \hline
+				Streamcluster & Parsec  &  \texttt{streamcluster 10 20 128 16384 16384 1000 none output.txt 1} \\ \hline
+				Swaptions & Parsec  &  \texttt{swaptions -ns 64 -sm 40000 -nt 1} \\ \hline
 			\end{tabular}
 		
 		\subsection{Memory improvement of compression}
 		
 		
 		\begin{figure}[h]
-			\caption{Memory compression plot}
-			\label{fig:mem-comp-plot}
-			\includegraphics[scale=0.6]{stride-detector}
+			\caption{Memory compression of Parsec applications}
+			\label{fig:mem-comp-plot-parsec}
+			\includegraphics[scale=0.6]{plots/mem_parsec_plot.png}
+		\end{figure}
+		\begin{figure}[h]
+			\caption{Memory compression of Rodinia applications}
+			\label{fig:mem-comp-plot-rodinia}
+			\includegraphics[scale=0.6]{plots/mem_rodinia_plot.png}
 		\end{figure}
 	
 		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
