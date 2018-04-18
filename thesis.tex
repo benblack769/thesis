@@ -1505,19 +1505,35 @@ find_overlapping_intervals(A : interval list, B : interval list)
 				Swaptions & Parsec  &  \texttt{swaptions -ns 64 -sm 40000 -nt 1} \\ \hline
 			\end{tabular}
 		
-		\subsection{Memory improvement of compression}
+	\section{Memory improvement of compression}
 		
 		
-		\begin{figure}[h]
+		\begin{figure}[H]
 			\caption{Memory compression of Parsec applications}
 			\label{fig:mem-comp-plot-parsec}
-			\includegraphics[scale=0.6]{plots/mem_parsec_plot.png}
+			\includegraphics[scale=0.8]{plots/mem_parsec_plot.png}
 		\end{figure}
-		\begin{figure}[h]
+		\begin{figure}[H]
 			\caption{Memory compression of Rodinia applications}
 			\label{fig:mem-comp-plot-rodinia}
-			\includegraphics[scale=0.6]{plots/mem_rodinia_plot.png}
+			\includegraphics[scale=0.8]{plots/mem_rodinia_plot.png}
 		\end{figure}
+	
+	\section{Identifying important parallelism}
+		
+		
+		
+		\begin{figure}[H]
+			\caption{}%Possible speedups with parallelization}
+			\label{fig:mem-comp-plot-rodinia}
+			
+			\begin{minipage}{0.73\textwidth} % choose width suitably
+				\includegraphics[scale=0.9]{plots/application_idealized_speedup.png}
+				{\footnotesize Speedup by parallelizing a particular loop in the given application assuming no overhead and infinite cores\par}
+			\end{minipage}
+		\end{figure}
+	
+	\section{Matching parallelism with other metrics}
 	
 		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
 			\hline
