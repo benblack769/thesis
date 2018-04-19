@@ -43,6 +43,7 @@
 \usepackage{float}
 \usepackage{algorithm}
 \usepackage[noend]{algpseudocode}
+\usepackage{subcaption}
 
 
 
@@ -1473,8 +1474,15 @@ find_overlapping_intervals(A : interval list, B : interval list)
 	
 		\subsection{Running applications}
 		
-		Command line argument filenames don't include the full path to the data file.
+		Table \ref{all-applications-table} is a complete table of all the applications which data was collected for, and the command line arguments which were used during collection. 
 		
+		Note that when the command line argument is a filename, it does not include the full path to the data file. The data files that are used are all ones that were included in the original benchmark, no new files were created. 
+		
+		
+		\begin{table}
+			\caption{Benchmark application and their inputs}
+			\label{all-applications-table}
+			\small
 			\begin{tabular}{ |l|l|l| }
 				\hline
 				Application          & Suite   & Command line arguments  \\ \hline
@@ -1504,26 +1512,34 @@ find_overlapping_intervals(A : interval list, B : interval list)
 				Streamcluster & Parsec  &  \texttt{streamcluster 10 20 128 16384 16384 1000 none output.txt 1} \\ \hline
 				Swaptions & Parsec  &  \texttt{swaptions -ns 64 -sm 40000 -nt 1} \\ \hline
 			\end{tabular}
+		\end{table}
 		
 	\section{Memory improvement of compression}
 		
+		Much of the work of this thesis was the implementation of two compressed versions of pairwise method: stride compression, based on SD$^3$, and bit compression. To see how these two methods compare, and how well they improve upon the naive implementation, all the versions were run on all the applications.
 		
-		\begin{figure}[H]
-			\caption{Memory compression of Parsec applications}
-			\label{fig:mem-comp-plot-parsec}
-			\includegraphics[scale=0.8]{plots/mem_parsec_plot.png}
-		\end{figure}
-		\begin{figure}[H]
-			\caption{Memory compression of Rodinia applications}
-			\label{fig:mem-comp-plot-rodinia}
-			\includegraphics[scale=0.8]{plots/mem_rodinia_plot.png}
+		The memory measurement is not perfect. The maximum memory consumption was measured by querying the Unix \texttt{ps} utility approximately every 20ms. As such, the resulting memory consumption is only an approximation. In particular, if the program allocated memory, and immediately freed the memory before \texttt{ps} was queried again, that additional memory would not be measured. However, that measurement error could only have significant impact on programs with small memory consumption and run quickly, which certainly do not describe our pairwise method implementations.
+		
+		The results are plotted in Figure \ref{fig:mem-comp-plot}. First, note that the naive method often an unacceptable amount of memory. Our system had 16gb of memory, and so the process was terminated after the program used over 14gb, which is why no process used more memory than that. 
+		
+		\begin{figure}
+			\caption{Memory compression of applications}
+			\label{fig:mem-comp-plot}
+			\begin{subfigure}[b]{0.6\textwidth}
+				\caption{Parsec applications}
+				\includegraphics[scale=0.7]{plots/mem_parsec_plot.png}
+			\end{subfigure}
+				\begin{subfigure}[b]{0.6\textwidth}
+					\caption{Rodinia applications}
+					\includegraphics[scale=0.7]{plots/mem_rodinia_plot.png}
+			\end{subfigure}
 		\end{figure}
 	
 	\section{Identifying important parallelism}
 		
 		
 		
-		\begin{figure}[H]
+		\begin{figure}
 			\caption{}%Possible speedups with parallelization}
 			\label{fig:mem-comp-plot-rodinia}
 			
@@ -1535,6 +1551,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 	
 	\section{Matching parallelism with other metrics}
 	
+		\begin{table}
 		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
 			\hline
 			Metric & Relevant hardware characteristic(s) \\
@@ -1556,6 +1573,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			Number of branch changes & Warp divergence and branch prediction \\
 			\hline
 		\end{tabular}
+	\end{table}
 	
 	
 \chapter{chpt2}
