@@ -1516,11 +1516,46 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		
 	\section{Memory improvement of compression}
 		
-		Much of the work of this thesis was the implementation of two compressed versions of pairwise method: stride compression, based on SD$^3$, and bit compression. To see how these two methods compare, and how well they improve upon the naive implementation, all the versions were run on all the applications.
+		Much of the work of this thesis was the implementation of two compressed versions of pairwise method: stride compression, based on SD$^3$, and bit compression. To see how these two methods compare, and how well they improve upon the naive implementation, all the versions were run on all the applications. The memory consumption of the native application was also collected for comparison. 
 		
-		The memory measurement is not perfect. The maximum memory consumption was measured by querying the Unix \texttt{ps} utility approximately every 20ms. As such, the resulting memory consumption is only an approximation. In particular, if the program allocated memory, and immediately freed the memory before \texttt{ps} was queried again, that additional memory would not be measured. However, that measurement error could only have significant impact on programs with small memory consumption and run quickly, which certainly do not describe our pairwise method implementations.
+		First, a caveat: the memory measurement technique is not perfect. The maximum memory consumption was measured by querying the Unix \texttt{ps} utility approximately every 20ms. As such, the resulting memory consumption is only an approximation. In particular, if the program allocated memory, and immediately freed the memory before \texttt{ps} was queried again, that additional memory would not be measured. However, that measurement error could only have significant impact on programs with small memory consumption and run quickly, which certainly do not describe our pairwise method implementations.
 		
-		The results are plotted in Figure \ref{fig:mem-comp-plot}. First, note that the naive method often an unacceptable amount of memory. Our system had 16gb of memory, and so the process was terminated after the program used over 14gb, which is why no process used more memory than that. 
+		The results are plotted in Figure \ref{fig:mem-comp-plot}. First, note that the naive method often uses an unacceptable amount of memory. Our system had 16gb of memory, and so the process was terminated after the program used over 14gb, which is why no process used more memory than that. The naive method used more that 14gb on 11 of the 21 applications, while neither the stride nor the bit compression methods hit that ceiling on any of the applications. This result confirms Kim et. al.'s observations that the naive method is not useful for important practical purposes.\footnote{\cite{Kim:2010}}
+		
+		%Next, note the huge variation in the absolute and relative overhead of all three implementations of the pairwise method. Sometimes the 
+		
+		%One question to ask is whether the stride method, with its additional complexity, but better theoretical compression, is better than the simpler and faster bit compression. 
+		Comparing the bit and stride compression, the results show some variance, with the bit compression sometimes performing better and sometimes worse than the stride version. For example, stride compression gets better results on srad, heartwall, and backprop, while bit compression does better on bfs and fluidanimate. But when bit compression performs better, it often performs much better, while stride compression only does better by a little. For example, srad is the application where stride performance beats bit compression by the greatest margin, only 47\% of the memory of the bit compression. Meanwhile, for bfs, bit compression uses only 6.2\% of the memory of stride compression.
+		
+		To see why bit compression can do so much better than stride compression, consider the case of bfs. The runtime of bfs is dominated by processing the text input, which is a list of edges. Text processing is not particularly stride friendly, since different instructions handle different parts of the text. 
+		
+		
+		
+		The main process of bfs is also not stride friendly. In the bfs code, the graph is implemented as an adjacency list. The inner loop of bfs traverses the edge list of a node, and touches another array based on the location specified by the edge. Code example \ref{code:bfs} is copied from the bfs source code,
+		
+		Since where it touches is dependent on the input, and a fixed constant off the previous access, it is not a stride. In 
+		
+\begin{codeexample}
+	\caption{Breadth first search inner loop}
+	\label{code:bfs}
+		\begin{verbatim}
+for(int i=h_graph_nodes[tid].starting; 
+        i<(h_graph_nodes[tid].no_of_edges + h_graph_nodes[tid].starting); 
+        i++) {
+    int id = h_graph_edges[i];
+    if(!h_graph_visited[id]) {
+        h_cost[id]=h_cost[tid]+1;
+        h_updating_graph_mask[id]=true;
+    }
+}
+		\end{verbatim}
+	\end{codeexample}
+		
+		Another surprising result is that the naive method uses comparable memory to the compressed methods on several applications, most notably Particle Filter and Needleman-Wunsch. This suggests that there are some applications which neither compression method works effectively on. 
+		
+		%This give evidence for the possibility that bit compression gives more reliable compression ratios than stride compression. To 
+		
+		%that the bit compression method is often 
 		
 		\begin{figure}
 			\caption{Memory compression of applications}
