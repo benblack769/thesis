@@ -1604,11 +1604,81 @@ for(int i=h_graph_nodes[tid].starting;
 	
 	\section{Identifying important parallelism}
 		
+		One of the goals of this thesis is to use parallelism detection to aid further analysis, for example estimating the effectiveness of GPU acceleration. 
+		This section evaluates whether the parallelism tool we built can be used for this purpose. In particular, we confirm that the tool does detect loops which could possibly be accelerated by massively parallel hardware for meaningful performance improvements. 
+		%In order for an analysis to be meaningful, the loops detected as parallel need to be important to application performance, and need to be scalable on many cores. %However, such an analysis would not work if  
+		%However, that will not be possible if the loops detected as parallel are not important for application performance. %  important loops, those that can be 
+		%In order for a parallelism detector tool to be useful, 
 		
+		%The effectiveness of the tools is questionable because it only detects trivially parallel loops: loops where each iteration is completely independent. Loops which can be parallelized with reductions or with locking mechanisms are not always identified as parallel. But we hope that this method will identify significant parallelism in many applications that can be parallelized on GPUs. % and will also help the programmer parallelize loops detected as not parallel. 
+		
+		\subsubsection{Significance of loops}
+		
+		Most loops are not worth investigating, and should be eliminated from further analysis. 
+		Programmers usually want to optimize entire applications; individual loops are only optimized when significant proportions of the application's running time is in the loop. 
+		%We found that certain loops, some parallelizable and some not, have outsized importance to program runtime. 
+		Figure \ref{fig:size-iteration-plots} shows the percentage of running time spent in the loops (estimated by machine instructions executed), how many iterations they have, and whether they were found to not have data conflicts (which means they are parallelizable). This plot includes all loops from all applications. 
+		%In the figure, loops which are parallel, and have a large number of iterations (blue dots, upper left) have a good chance of being usefully parallelized on GPUs. 
+		%Loops which are not found to be parallel, but do have a large number of iterations, and are important (red dots, upper left) can be reported to the programmer as worthy of further investigation. Perhaps they can be parallelized with a reduction or with some data synchronization. 
+		
+		%In this plot, as with the all of our analysis, running time is estimated with number of machine instructions executed. 
+		%We use the proportion of instructions evaluated in the loop to estimate how much time is spent in a loop. % we estimate the percentage of time spent in the loop. This is estimated b calculate the %evaluate how important  is a metric for loop importance relative \
+		%This metric is placed as a function of loop iterations is displayed on Figure . The higher the loop is on the graph, the more important it in the application performance.
 		
 		\begin{figure}
-			\caption{}%Possible speedups with parallelization}
-			\label{fig:mem-comp-plot-rodinia}
+			\caption{Loop importance and parallelizability}
+			\label{fig:size-iteration-plots}
+			\includegraphics[scale=0.7]{plots/size_iteration_plot.png}
+		\end{figure}
+		
+		This plot shows that there are several loops which can be trivially parallelized for significant application speedup. 
+		These are the loops which are parallel (do not have conflicts) and have substantial number of iterations (blue dots, upper left). These can be reported to the programmer as targets of trivial parallelization. 
+		
+		The important loops that are not parallel (have conflicts) but have a large number of iterations are also important (red dots, upper left). These loops could possibly be parallelized with a reduction or with data synchronization, and should be reported to the programmer for further investigation.
+		
+		But the dots near the bottom are unimportant to application performance, and so should be ignored. This eliminates most of the loops from consideration. 75\% of the loops include less than 1\% of the total runtime of their respective application, and 83\% of loops include less than 10\% of application runtime). 
+		
+		%And the dots on the far left cannot be parallelized to a high degree.
+		% These loops could be reported to the programmer as ones that should be investigated for non-trivial parallelization.
+		
+		%From this plot, you can see that there are many important loops, some of which are parallel, and some of which are not, some of which have many iterations, some of which have few.
+		%This
+		
+		\subsubsection{Parallelizability of applications}
+		
+		The applications profiled are all parallelizable to some degree, and many of them can be run effectively on GPUs. Does the tool detect all these applications as having significant potential to parallelize?
+		
+		To answer this, we introduce a metric for loop speedup which assumes a sort of idealized parallelism. It is calculated with:
+		$$\text{loop speedup} = \text{loop size} - \frac{\text{loop size}}{\text{iterations per instance}} $$
+		Where the loop size is the proportion of time (approximated by instruction count) spent inside the loop.
+		This speedup estimate assumes no overhead, infinite cores, and uniform loop iterations.
+		These assumptions are extremely optimistic, and so this estimate of loop speedup may also be overly optimistic. But it gives a rough estimate of parallizabililty. Many of the loops which score highly, for example, the main loop of blackscholes, are in fact highly parallelizable. The loops which score poorly, are certainly not useful to parallelize. 
+		So this metric can be interpreted as an upper bound on how much the loop can reduce application performance if parallelized. 
+		
+		We detected some substantial parallelism in most of the profiled applications. 
+		Figure \ref{fig:application-parr} shows speedup of entire applications assuming idealized parallelization of a single loop in the program. BFS, hotspot and lavaMD show little potential for parallelism, as none of the parallel loops are very important to the application. Others, for example heartwall, LUD, and blackscholes show promise for large performance gains by parallelizing a single loop. Others are more ambiguous, such as swaptions and fluidanimate, because while parallelizing a single loop cannot increase application performance that much, it is possible that parallelizing several loops can in fact improve performance substantially. Since this plot only gives information about a single, loop, it cannot say either way.
+		
+		\subsubsection{Uniformity of useful parallel loops}
+		
+		
+		\subsubsection{Scale of detected parallelism}
+		
+		
+		\subsubsection{Scale of detected parallelism}
+		
+		%It will be used only to eliminate loops which score poorly from consideration. This will eliminate the many small loops with little importance to the program, and also loops which are not detected to be parallelizable. 
+		
+		%, or loops with . Loops which score low on this metric will not be useful to parallelize, loops that score high are not necessarily good candidates for parallelization. 
+		
+		
+		
+		%first cutlook at how 
+		
+		%These assumptions can certainly lead to misleading results, it sometimes corresponds to actual parallelization.
+		
+		\begin{figure}
+			\caption{Performance improvement by idealized parallelization}%Possible speedups with parallelization}
+			\label{fig:application-parr}
 			
 			\begin{minipage}{0.73\textwidth} % choose width suitably
 				\includegraphics[scale=0.9]{plots/application_idealized_speedup.png}
