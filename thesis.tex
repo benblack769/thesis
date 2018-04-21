@@ -1655,16 +1655,66 @@ for(int i=h_graph_nodes[tid].starting;
 		These assumptions are extremely optimistic, and so this estimate of loop speedup may also be overly optimistic. But it gives a rough estimate of parallizabililty. Many of the loops which score highly, for example, the main loop of blackscholes, are in fact highly parallelizable. The loops which score poorly, are certainly not useful to parallelize. 
 		So this metric can be interpreted as an upper bound on how much the loop can reduce application performance if parallelized. 
 		
+		
+		\begin{figure}
+			\caption{Performance improvement by idealized parallelization}%Possible speedups with parallelization}
+			\label{fig:application-parr}
+			
+			\begin{minipage}{0.73\textwidth} % choose width suitably
+				\includegraphics[scale=0.9]{plots/application_idealized_speedup.png}
+				{\footnotesize Speedup by parallelizing a particular loop in the given application assuming no overhead and infinite cores\par}
+			\end{minipage}
+		\end{figure}
+		
 		We detected some substantial parallelism in most of the profiled applications. 
 		Figure \ref{fig:application-parr} shows speedup of entire applications assuming idealized parallelization of a single loop in the program. BFS, hotspot and lavaMD show little potential for parallelism, as none of the parallel loops are very important to the application. Others, for example heartwall, LUD, and blackscholes show promise for large performance gains by parallelizing a single loop. Others are more ambiguous, such as swaptions and fluidanimate, because while parallelizing a single loop cannot increase application performance that much, it is possible that parallelizing several loops can in fact improve performance substantially. Since this plot only gives information about a single, loop, it cannot say either way.
 		
 		\subsubsection{Uniformity of useful parallel loops}
 		
+		It greatly simplifies analysis to assume that important parallel loops are uniform, i.e., all the loop iterations do the same amount of work. While this is true for most loops, some loops have substantial and problematic variability in iteration size that can impact parallelizability. 
+			
+		To see why this is a problem, consider the idealized parallel machine where infinite threads can run in parallel. Consider a loop with 1000 iterations that can run in parallel, but one of those loop iterations takes as much time all the others combined. In this case, overall loop performance can at most be doubled. But if you assume uniformity of iterations, then performance would be calculated to increase by 1000 times, so the actual and predicted speedup would be off by a factor of 500. 
+		%So non-uniform loops have serious implications to parallelizability. %This is even more important in the case of massively parallel hardware, like GPUs, since each thread is slower than a GPU thread. 
+		
+		Luckily, for the applications chosen, most loops are roughly uniform. Figure \ref{fig:uniformity-tail-etc} shows a metric of uniformity plotted over the number of iterations per loop instance. The metric chosen is the maximum iteration size over the mean size. Only loops which could speed up the program by 10\% or more assuming idealized parallelism are shown. 
+		
+		The two dots in the top left of the graph are loops which have serious problems for parallelizability. They only have 10 loop iterations each on average, but the maximum iteration size is 10 times the mean iteration. This means that performance may not be increased substantially by parallelization, since one iteration dominates the runtime. 
+		
+		The loop that appears in the top right of the graph is not so problematic. After all, it has over 10,000 loop iterations. If the iterations are carefully distributed over threads, it is possible that the variance between iteration sizes would not have a significant impact on performance, since the smaller iterations could be coalesced together into threads comparable to the large thread.
+		
+		The loops which show moderate amounts of variance need to be similarly evaluated on a case by case basis. But 67\% of the important loops shown, the max iteration size is less than 10\% greater than the mean iteration size, which means that most of the important loops are in fact uniform. 
+		
+		%So a value of 10 means that the maximum 
+		
+		%High values indicate some variance in the 
+		
+		\begin{figure}
+			\caption{Uniformity of loop iterations}
+			\label{fig:uniformity-tail-etc}
+			
+			\begin{minipage}{0.6\textwidth} % choose width suitably
+				\includegraphics[scale=0.7]{plots/tail_iters.png}
+				{\footnotesize Loops which could speed up the program by 10\% or more assuming idealized parallelism \par}
+			\end{minipage}
+		\end{figure}
 		
 		\subsubsection{Scale of detected parallelism}
 		
+		The scale of the parallelism is one of the most important considerations when evaluating what sort of hardware to run the loop on. 
+		In particular, 
+		CPUs can run a small number of threads quic
 		
-		\subsubsection{Scale of detected parallelism}
+		\begin{figure}
+			\caption{Uniformity of loop iterations}
+			\label{fig:uniformity-tail-etc}
+			
+			\begin{minipage}{0.6\textwidth} % choose width suitably
+				\includegraphics[scale=0.7]{plots/categorized_conflicts.png}
+				{\footnotesize Loops which could speed up the program by 10\% or more assuming idealized parallelism \par}
+			\end{minipage}
+		\end{figure}
+		
+		
 		
 		%It will be used only to eliminate loops which score poorly from consideration. This will eliminate the many small loops with little importance to the program, and also loops which are not detected to be parallelizable. 
 		
@@ -1676,39 +1726,23 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		%These assumptions can certainly lead to misleading results, it sometimes corresponds to actual parallelization.
 		
-		\begin{figure}
-			\caption{Performance improvement by idealized parallelization}%Possible speedups with parallelization}
-			\label{fig:application-parr}
-			
-			\begin{minipage}{0.73\textwidth} % choose width suitably
-				\includegraphics[scale=0.9]{plots/application_idealized_speedup.png}
-				{\footnotesize Speedup by parallelizing a particular loop in the given application assuming no overhead and infinite cores\par}
-			\end{minipage}
-		\end{figure}
 	
 	\section{Matching parallelism with other metrics}
 	
 		\begin{table}
-		\begin{tabular}{ |p{5.5cm}|p{8cm}| }
+			\caption{Other metrics collected}
+		\begin{tabular}{ |p{4.5cm}|p{11cm}| }
 			\hline
-			Metric & Relevant hardware characteristic(s) \\
+			Metric name & Metric description \\
 			\hline \hline
-			Number of iterations per loop instance & Potential for massive parallelism \\
-			\hline
-			Length of loop iterations by instruction count & Potential for massive parallelism \\
-			\hline
-			Number of writes/reads & Memory bandwidth??? \\
-			\hline
-			Bytes accessed per instance & Memory bandwidth??? Compare w/Footprint for temporal locality? \\
-			\hline
-			Total memory footprint of loop & Compare with Bytes for temporal locality?  \\
-			\hline
-			Shared memory footprint between loop iterations & Cross-thread spacial locality \\
-			\hline
-			Strided accesses  & Latency vs bandwidth \\
-			\hline
-			Number of branch changes & Warp divergence and branch prediction \\
-			\hline
+			SwitchesOverBranches & Number of time a branch path changes direction over the number of times a branch instruction is executed \\ \hline
+			SwitchesOverInstructions & Number of time a branch path changes direction over the number of instructions executed \\ \hline
+			PercNonStridedAccesses & Percentage of accesses which do not access memory as a stride \\ \hline
+			StridedAccessesBelow16 & Percentage of accesses which are strides of length 16 bytes or less \\ \hline
+			StridedAccessesAbove16 &  Percentage of accesses which are strides of length 16 bytes or more \\ \hline
+			PercFixedAccesses & Percentage of accesses which are strides of length zero, i.e. they access the same location of memory location repeatedly \\ \hline
+			MemoryAccessesPerInstr & Number of memory accesses over number of instructions \\ \hline
+			PercAccessesReads & Percentage of memory accesses which are reads  \\ \hline
 		\end{tabular}
 	\end{table}
 	
