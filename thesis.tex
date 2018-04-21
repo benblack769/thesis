@@ -1544,9 +1544,9 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		Next consider the respective memory overhead of stride compression and bit compression. 
 		Recall that in theory, stride compression can also do much better than bit compression. In the best case, stride compression can make profiling memory consumption independent of input size, as the entire working memory can be compressed into a single stride. Of course, this ideal scenario is highly unlikely in real programs, and in the worst case, little memory is accessed in a strided manner, and stride compression does no better than the naive version. Bit compression claims to be less dependent on program characteristics, as it stores blocks of contiguous accesses, but it can also do as poorly as the naive method in cases where different instructions access the same blocks of memory. So determining which method is better needs to be measured on real applications. 
 		
-		As a caveat, note that this stride implementation is not completely comparable to SD$^3$, since we added an AccessSet, which SD$^3$ does not store. % this set does not store instruction information, this table is much less memory intensive than the complete. %Although it's indepen bit table is stored as well as the stride table. 
+		As a caveat, note that this stride compression implementation is not completely comparable to SD$^3$, since we added an AccessSet, which SD$^3$ does not store. % this set does not store instruction information, this table is much less memory intensive than the complete. %Although it's indepen bit table is stored as well as the stride table. 
 		
-		Overall, the performance of the methods depends on the applications. Bit compression sometimes performs better and sometimes worse than the stride version. For example, stride compression gets better results on srad, heartwall, and backprop, while bit compression does better on bfs and fluidanimate. But when bit compression performs better, it sometimes performs much better, while stride compression only does better by a little. For example, srad is the application where stride performance beats bit compression by the greatest margin, only 47\% of the memory of the bit compression. Meanwhile, for bfs, bit compression uses only 6.2\% of the memory of stride compression, a huge improvement.
+		Overall, the performance of the methods depends on the applications. Bit compression sometimes performs better and sometimes worse than stride compression. For example, stride compression gets better results on srad, heartwall, and backprop, while bit compression does better on bfs and fluidanimate. But when bit compression performs better, it sometimes performs much better, while stride compression only does better by a little. For example, srad is the application where stride compression beats bit compression by the greatest margin, using only 47\% of the memory of bit compression. Meanwhile, for bfs, bit compression uses only 6.2\% of the memory of stride compression, a huge improvement.
 		
 		To see why bit compression can do so much better than stride compression, consider the case of bfs. The runtime of bfs is dominated by processing the text input, which is a list of integer pairs that represent graph edges. For example, take the following:
 		
@@ -1562,7 +1562,9 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		This text will not be processed with highly strided acceses.
 		Assuming an ordinary implementation of text processing, the method to process the integer \texttt{2541} will exit when the space is hit, and then will start again when processing the integer \texttt{3}. But these will be stored as two short strides, not one, since the space in between the intergers is skipped. Bit compression stores whole blocks of memory, so the two sequences of accesses will most likely be put in the same block, and also the accesses created by processing the next few lines. %The actual implementation uses repeated calls to fread, but presumably under the covers something like this is going on.
 		
-		The main process of bfs is also not stride friendly. In the bfs code, the graph is implemented as an adjacency list. The inner loop of bfs traverses the edge list of a node, and touches another array based on the location specified by the edge. Code example \ref{code:bfs} is the inner loop of bfs copied from the bfs source code. The \texttt{h\_graph\_edges} array stores the edge list, and the value it stores is used as an index into the \texttt{h\_graph\_visited} array. Since the locations at which the memory is access is dependent on the values in the input, the accesses to the \texttt{h\_graph\_visited} will not be a stride. 
+		The main process of bfs is also not stride friendly. In the breadth first search code, the graph is implemented as an adjacency list. 
+		%The inner loop of bfs traverses the edge list of a node, and touches another array based on the location specified by the edge. 
+		Code example \ref{code:bfs} is the inner loop of bfs copied from the bfs source code. The \texttt{h\_graph\_edges} array stores the edge list, and the value it stores is used as an index into the \texttt{h\_graph\_visited} array. Since the locations at which the memory is access is dependent on the values in the input, the accesses to the \texttt{h\_graph\_visited} will not be a stride. 
 		
 		
 \begin{codeexample}
@@ -1589,21 +1591,14 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		\subsection{Future work}
 		
-		Applications are continuing to get more and more memory intensive, and so we will continue to need better memory compression methods to support that growth. We were considering using the SPEC 2017 applications, but found that some of applications on "train" inputs were consuming too much memory. The deepsjeng\_s application used almost 7gb of memory on intspeed.
-		xz 900mb
-		gcc 600mb
+		Applications are continuing to get more and more memory intensive, and so we will continue to need better memory compression methods to support that growth. We were considering using the SPEC 2017 applications, but found that some of applications on "train" inputs were consuming too much memory. Running the deepsjeng\_s application natively used almost 7gb of memory on intspeed, and the lbs\_s application used 3.1gb of memory on fpspeed. Even assuming optimistic compression ratios of the current implementations, the memory overhead of these methods would measure in dozens of gigabytes, far more than ordinary systems have. 
+
+		%These memory numbers far exceed that of the SPEC 2006 memory consumption on train inputs. 
 		
-		fpspeed
-		bwaves 800mb
-		lbm\_s\_base.myte 3.1gb
-		speed\_pop2\_base 1.4gb
-		
-		These memory numbers far exceed that of the SPEC 2006 memory consumption on train inputs. 
-		
-		One possiblilty to improve compression ratios is to combine the stride and bit compression. This can be done by implementing the point table using bit compression, and possibly by putting small strides in the point table when they can't be merged in with larger strides. 
+		One possibility to improve compression ratios is to combine the stride and bit compression. This can be done by implementing the point table using bit compression, and possibly by putting small strides in the point table when they can't be merged in with other strides. 
 		
 	
-	\section{Identifying important parallelism}
+	\section{Identifying important parallelism}\label{s:important-paralleism}
 		
 		One of the goals of this thesis is to use parallelism detection to aid further analysis, for example estimating the effectiveness of GPU acceleration. 
 		This section evaluates whether the parallelism tool we built can be used for this purpose. In particular, we confirm that the tool does detect loops which could possibly be accelerated by massively parallel hardware for meaningful performance improvements. 
@@ -1637,7 +1632,7 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		The important loops that are not parallel (have conflicts) but have a large number of iterations are also important (red dots, upper left). These loops could possibly be parallelized with a reduction or with data synchronization, and should be reported to the programmer for further investigation.
 		
-		But the dots near the bottom are unimportant to application performance, and so should be ignored. This eliminates most of the loops from consideration. 75\% of the loops include less than 1\% of the total runtime of their respective application, and 83\% of loops include less than 10\% of application runtime). 
+		But the dots near the bottom are unimportant to application performance, and so should be ignored. This eliminates most of the loops from consideration. 75\% of the loops include less than 1\% of the total runtime of their respective application. 
 		
 		%And the dots on the far left cannot be parallelized to a high degree.
 		% These loops could be reported to the programmer as ones that should be investigated for non-trivial parallelization.
@@ -1647,7 +1642,7 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		\subsubsection{Parallelizability of applications}
 		
-		The applications profiled are all parallelizable to some degree, and many of them can be run effectively on GPUs. Does the tool detect all these applications as having significant potential to parallelize?
+		The applications profiled are all parallelizable to some degree, and many of them can be run effectively on GPUs. Does the tool detect all these applications as having significant potential to parallelize? 
 		
 		To answer this, we introduce a metric for loop speedup which assumes a sort of idealized parallelism. It is calculated with:
 		$$\text{loop speedup} = \text{loop size} - \frac{\text{loop size}}{\text{iterations per instance}} $$
@@ -1656,7 +1651,7 @@ for(int i=h_graph_nodes[tid].starting;
 		These assumptions are extremely optimistic, and so this estimate of loop speedup may also be overly optimistic. But it gives a rough estimate of parallizabililty. Many of the loops which score highly, for example, the main loop of blackscholes, are in fact highly parallelizable. The loops which score poorly, are certainly not useful to parallelize. 
 		So this metric can be interpreted as an upper bound on how much the loop can reduce application performance if parallelized. 
 		
-		
+		%\subsubsection{Substantial parallelism of }
 		\begin{figure}
 			\caption{Performance improvement by idealized parallelization}%Possible speedups with parallelization}
 			\label{fig:application-parr}
@@ -1670,20 +1665,22 @@ for(int i=h_graph_nodes[tid].starting;
 		We detected some substantial parallelism in most of the profiled applications. 
 		Figure \ref{fig:application-parr} shows speedup of entire applications assuming idealized parallelization of a single loop in the program. BFS, hotspot and lavaMD show little potential for parallelism, as none of the parallel loops are very important to the application. Others, for example heartwall, LUD, and blackscholes show promise for large performance gains by parallelizing a single loop. Others are more ambiguous, such as swaptions and fluidanimate, because while parallelizing a single loop cannot increase application performance that much, it is possible that parallelizing several loops can in fact improve performance substantially. Since this plot only gives information about a single, loop, it cannot say either way.
 		
+		This estimate of application speedup is not particularly helpful information to give to a programmer, because it is a poor indicator of application parallelizability, but it can give some confidence that the parallelism tool will in fact be somewhat useful for many different applications. 
+		
 		\subsubsection{Uniformity of useful parallel loops}
 		
 		It greatly simplifies analysis to assume that important parallel loops are uniform, i.e., all the loop iterations do the same amount of work. While this is true for most loops, some loops have substantial and problematic variability in iteration size that can impact parallelizability. 
 			
-		To see why this is a problem, consider the idealized parallel machine where infinite threads can run in parallel. Consider a loop with 1000 iterations that can run in parallel, but one of those loop iterations takes as much time all the others combined. In this case, overall loop performance can at most be doubled. But if you assume uniformity of iterations, then performance would be calculated to increase by 1000 times, so the actual and predicted speedup would be off by a factor of 500. 
+		To see why this is a problem, consider the idealized parallel machine where infinite threads can run in parallel. Consider a loop with 1000 iterations that can run in parallel, but one of those loop iterations takes as much time all the others combined. In this case, overall loop performance can at most be doubled. But if you assume uniformity of iterations, then performance would be calculated to increase by 1000 times, so the actual and predicted speedup would be off by a factor of 500. In real massively parallel machines, this problem can be even worse, since each thread of a massively parallel machine is typically slower than a thread of a CPU. 
 		%So non-uniform loops have serious implications to parallelizability. %This is even more important in the case of massively parallel hardware, like GPUs, since each thread is slower than a GPU thread. 
 		
 		Luckily, for the applications chosen, most loops are roughly uniform. Figure \ref{fig:uniformity-tail-etc} shows a metric of uniformity plotted over the number of iterations per loop instance. The metric chosen is the maximum iteration size over the mean size. Only loops which could speed up the program by 10\% or more assuming idealized parallelism are shown. 
 		
-		The two dots in the top left of the graph are loops which have serious problems for parallelizability. They only have 10 loop iterations each on average, but the maximum iteration size is 10 times the mean iteration. This means that performance may not be increased substantially by parallelization, since one iteration dominates the runtime. 
+		The two dots in the top left of the graph are loops which have serious problems for parallelizability. They only have 10 loop iterations each on average, but the maximum iteration size is 10 times the mean iteration. This means that performance may not be increased substantially by parallelization, since a single iteration dominates the runtime of the loop. 
 		
 		The loop that appears in the top right of the graph is not so problematic. After all, it has over 10,000 loop iterations. If the iterations are carefully distributed over threads, it is possible that the variance between iteration sizes would not have a significant impact on performance, since the smaller iterations could be coalesced together into threads comparable to the large thread.
 		
-		The loops which show moderate amounts of variance need to be similarly evaluated on a case by case basis. But 67\% of the important loops shown, the max iteration size is less than 10\% greater than the mean iteration size, which means that most of the important loops are in fact uniform. 
+		The loops which show moderate amounts of variance need to be similarly evaluated on a case by case basis. But 67\% of the important loops shown, the max iteration size is less than 10\% greater than the mean iteration size, so most of the important loops are in fact uniform. 
 		
 		%So a value of 10 means that the maximum 
 		
@@ -1701,13 +1698,15 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		\subsubsection{Scale of detected parallelism}
 		
-		The scale of the parallelism is one of the most important considerations when evaluating what sort of hardware to run the loop on. 
-		In particular, 
-		CPUs can run a small number of threads quic
+		The scale of the parallelism is one of the most important considerations when evaluating what sort of hardware to run the loop on. There are two aspects to scale. 
+		
+		First, there is the number of threads the work can be divided into. GPUs can run thousands of threads in parallel, where CPUs can at most run a few dozen. Since loops iterations are usually uniform, this can be estimated with the number of iterations in a loop instance. 
+		
+		Second, there is the amount of work that is done in each thread. Unlike idealized parallelism, real world parallelism on both CPUs and GPUs requires substantial time for the hardware to divide the work into parallel threads at runtime. This means that loops which do little work per iteration and have few iterations may not be effectively divided onto threads on either GPUs or CPUs. 
 		
 		\begin{figure}
-			\caption{Uniformity of loop iterations}
-			\label{fig:uniformity-tail-etc}
+			\caption{Parallelism scale of important parallel loops}
+			\label{fig:paralleism-scale}
 			
 			\begin{minipage}{0.6\textwidth} % choose width suitably
 				\includegraphics[scale=0.7]{plots/categorized_conflicts.png}
@@ -1715,6 +1714,23 @@ for(int i=h_graph_nodes[tid].starting;
 			\end{minipage}
 		\end{figure}
 		
+		Figure \ref{fig:paralleism-scale} plots these two metrics for the important parallel loops in all the applications. 
+		
+		\subsubsection{Questionable parallelizability of some important parallel loops}
+		
+		The loops in the bottom left of Figure \ref{fig:paralleism-scale} may not be parallelizable because the overhead of distributing iterations of the loop onto either CPU or GPU threads may be greater than the benefit of parallelizing the loop. 
+		
+		There are types of parallelism which do not involve threads, such as CPU vectorized instruction. There are also optimizations, such as thread pools, which can minimize overhead of thread processing. Finally, sometimes parallelizable nested loops can be combined into a single parallel loop which does more work. But until further investigation, the loops on the bottom left corner of Figure \ref{fig:paralleism-scale} may not be large enough to parallelize. 
+		
+		\subsubsection{Scale of parallelism on CPUs vs. GPUs}
+		
+		CPUs can run a small number of threads effectively, and are ideal for parallelizing loops with a small number of iterations (colored red).%, and also have substantial work done each iteration (near the top). There are three such important loops in the applications. 
+		%
+		GPUs are ideal for loops which have a large number of iterations (colored green).%, and have non-trivial work done each iteration (not at the bottom left). 
+		%
+		Loops which have a middling number of iterations (colored blue), and also have substantial work done per iteration (upper part of the graph), could be parallelized more effectively on a GPU or a CPU depending on the hardware under consideration. %If the programmer is targeting a server with 32 hardware threads, then that might result in a different evaluation than if the platform is a laptop with 4 hardware threads.%ifFor example in a decision between a laptop with 4 hardware threads and a integrated graphics card with 
+		
+		%CPU threads have substantial overhead: even using optimizations to reduce thread overhead like thread pools, it is not always beneficial to parallelize loops with little work in the inside of the loop, such as the loops near the bottom and left of the plot. 
 		
 		
 		%It will be used only to eliminate loops which score poorly from consideration. This will eliminate the many small loops with little importance to the program, and also loops which are not detected to be parallelizable. 
@@ -1726,39 +1742,82 @@ for(int i=h_graph_nodes[tid].starting;
 		%first cutlook at how 
 		
 		%These assumptions can certainly lead to misleading results, it sometimes corresponds to actual parallelization.
+		\subsection{Future work}
 		
+		This section suggests that this parallelism information can be rather useful to both the programmer and any further characterization of the code. Future work could create a tool which a programmer can easily use to evaluate parallelism. The programmer would provide the inputs to the application, and the analysis tool will tell the programmer where to consider different sorts of parallelism.
+		
+		A crude version of this tool was implemented to help debug the parallelism detector. It annotates the code with comments containing the instruction addresses of the loops and with information about conflicts. Code example \ref{ce:par-tool-output} shows an example of this output on some matrix multiplication code. Note that the actual tool outputs more information, and the output is truncated here for better presentation. 
+		
+		\begin{codeexample}
+			\caption{Example output of parallelism tool}
+			\label{ce:par-tool-output}
+		\begin{verbatim}
+		const int size = 100;
+		int * A = random_array(size*size);
+		int * B = random_array(size*size);
+		int * C = random_array(size*size);
+		// LOOP 4006b9: ConflictedIterations: 0 TotalLoopIterations: 101
+		for(int i = 0; i < size; i++){
+		    // LOOP 4006ca: ConflictedIterations: 0 TotalLoopIterations: 10100 
+		    for(int j = 0; j < size; j++){
+		        // LOOP 4006db: ConflictedIterations: 990000 TotalLoopIterations: 1010000
+		        for(int k = 0; k < size; k++){
+		            // PARALLEL_CONFLICT FOR 4006db: LaterPC: 400701 EarlierPC: 400760 NumConflictIters: 990000
+		            C[i*size+j] += B[i*size+k] * A[k*size+j];
+		        }
+		    }
+		}
+		\end{verbatim}
+		\end{codeexample}
+		
+		Future work could improve the tool by:
+		
+		\begin{itemize}
+			\item Adding more useful information about the loops such as the length and variance of its iteration sizes
+			\item Summarizing the important parallel and possibly parallel loops to investigate further
+			\item Making the output more user friendly
+		\end{itemize} 
 	
 	\section{Matching parallelism with other metrics}
 	
-		As discussed in Section \ref{s:workload-characht}, choosing the right hardware involves other considerations than just the scale of parallelism. 
+		One goal of this thesis is to try to characterize programs that are effective on CPUs vs GPUs. But as discussed in Section \ref{s:workload-characht}, choosing the right hardware requires investigating other program metrics than just the scale of parallelism. GPUs and CPUs have all sorts of different hardware characteristics, including parallelism models which treat branches differently, memory models which give different importance to predictable memory, and more. To capture some of these differences we collected the metrics described in Table \ref{table:metric-names} for each loop.
+		
 		
 		\begin{table}
 			\caption{Other metrics collected}
-		\begin{tabular}{ |p{4.5cm}|p{11cm}| }
-			\hline
-			Metric name & Metric description \\
-			\hline \hline
-			SwitchesOverBranches & Number of time a branch path changes direction over the number of times a branch instruction is executed \\ \hline
-			SwitchesOverInstructions & Number of time a branch path changes direction over the number of instructions executed \\ \hline
-			PercNonStridedAccesses & Percentage of accesses which do not access memory as a stride \\ \hline
-			StridedAccessesBelow16 & Percentage of accesses which are strides of length 16 bytes or less \\ \hline
-			StridedAccessesAbove16 &  Percentage of accesses which are strides of length 16 bytes or more \\ \hline
-			PercFixedAccesses & Percentage of accesses which are strides of length zero, i.e. they access the same location of memory location repeatedly \\ \hline
-			MemoryAccessesPerInstr & Number of memory accesses over number of instructions \\ \hline
-			PercAccessesReads & Percentage of memory accesses which are reads  \\ \hline
-		\end{tabular}
-	\end{table}
-	
-	
-	\begin{figure}
-		\caption{Other metrics iterations}
-		\label{fig:other-metrics}
+			\label{table:metric-names}
+			\begin{tabular}{ |p{4.5cm}|p{11cm}| }
+				\hline
+				Metric name & Metric description \\
+				\hline \hline
+				SwitchesOverBranches & Number of time a branch path changes direction over the number of times a branch instruction is executed \\ \hline
+				SwitchesOverInstructions & Number of time a branch path changes direction over the number of instructions executed \\ \hline
+				PercNonStridedAccesses & Percentage of accesses which do not access memory as a stride \\ \hline
+				StridedAccessesBelow16 & Percentage of accesses which are strides of length 16 bytes or less \\ \hline
+				StridedAccessesAbove16 &  Percentage of accesses which are strides of length 16 bytes or more \\ \hline
+				PercFixedAccesses & Percentage of accesses which are strides of length zero, i.e. they access the same location of memory location repeatedly \\ \hline
+				MemoryAccessesPerInstr & Number of memory accesses over number of instructions \\ \hline
+				PercAccessesReads & Percentage of memory accesses which are reads  \\ \hline
+			\end{tabular}
+		\end{table}
 		
-		\begin{minipage}{0.6\textwidth} % choose width suitably
-			\includegraphics[scale=0.7]{plots/stats_variablility_plot.png}
-			{\footnotesize Loops which could speed up the program by 10\% or more assuming idealized parallelism \par}
-		\end{minipage}
-	\end{figure}
+		\subsubsection{Variability of metrics in important parallel loops}
+		
+		These metrics will only be important in predicting overall performance if they are not consistent across all the loops. Figure \ref{fig:other-metrics} tries to capture single variable variance by showing how all the important parallel loops score on the different metrics. 
+		
+		\begin{figure}
+			\caption{Other metrics iterations}
+			\label{fig:other-metrics}
+			
+			\begin{minipage}{0.6\textwidth} % choose width suitably
+				\includegraphics[scale=0.7]{plots/stats_variablility_plot.png}
+				{\footnotesize Loops which could speed up the program by 10\% or more assuming idealized parallelism \par}
+			\end{minipage}
+		\end{figure}
+	
+		\subsection{Future work}
+		
+		Unfortunately, due to time restrictions, we were not able to use the metrics to evaluate loop performance on different hardware. Future work would combine metrics similar to these with parallelism summaries discussed in Section \ref{s:important-paralleism}.
 
 \chapter*{Conclusion}
          \addcontentsline{toc}{chapter}{Conclusion}
