@@ -171,22 +171,61 @@
 \chaptermark{Introduction}
 \markboth{Introduction}{Introduction}
 
-	\section{Benefits of Heterogeneous Computing}
+	\section{Benefits of GP-GPU Computing}
 	
-		Traditional general purpose processors are designed to be easy to program while being as fast as possible at many different computation tasks. This allows the vast majority of applications to use general purpose processors exclusively. But some applications, such as network routing or bitcoin mining, require extremely high performance which demands highly specialized hardware that performs a specific set of tasks as quickly as possible, and generally has limited programmability. 
+		Traditional general purpose processors are designed to be easy to program while being as fast as possible at many different computation tasks. This allows the vast majority of applications to use general purpose processors exclusively. But some applications require higher performance than general purpose processors can provide. 
 		
-		Recently, some hardware has fallen in between these two extremes. Of particular note, Graphics Processing Units (GPUs), originally designed to accelerate graphics processing, have since been used for many different applications. They have been especially successful at accelerating numeric computations that are important in the sciences.  GPUs have specialized programming languages, in particular CUDA and OpenCL which allows the programmer to use the GPUs features effectively.
-		This shift towards GPU computing has resulted in large gains of performance and power consumption that has allowed for completely new types of algorithms and methods to be used. %For example, GPUs are credited deep learning %for numerical programs has 
+		Sometimes, hardware can be built to run specific applications. Tasks like network routing or bitcoin mining require extremely high performance, and so hardware was developed to run specific procedures which these applications rely on. But this hardware is often useless for other applications. This hardware also cannot be used in user facing applications because the user usually does not have access to the hardware.  % which demands highly specialized hardware that performs a specific set of tasks as quickly as possible, and generally has limited programmability. 
 		
-	\section{Challenges of Heterogeneous Computing}
+		% fallen in between these two extremes. Of particular note,
+		Graphics Processing Units (GPUs) are a type of specialized hardware that was developed to speed up graphics for video games. GPUs have become extremely widespread, being ubiquitous in desktops, laptops, and phones. GPUs have much smaller and less powerful cores than general purpose processors, but they have many more of them. Today, a high end CPU might have around 16 cores, whereas a high end GPU might have over a thousand. % This allows a GPU to run certain algorithms much  %But as they became more general to support different types of procedures for graphics, they became able to 
+		
+		While GPUs were designed for video games, they have since been used for many different applications. To reflect this, they are sometimes called general purpose GPUs, or GP-GPUs.
+		Programming languages such as CUDA and OpenCL have been developed to make programming GPU procedures easier while allowing access to the GPU hardware features. These languages allow the programmer to use the GPUs features effectively to accelerate their programs.
+		To use a GPU, an application would send data and code to the GPU, which would use the code to process the data and send back the results. Since the application uses different hardware to achieve a single goal, this is called heterogeneous computing. 
+		
+		GPUs have been especially successful at accelerating numeric computations that are important in the sciences (for example, matrix multiplication). 
+		This shift towards GPU computing has resulted in an order of magnitude gain in performance and power consumption of certain scientific applications that has allowed for completely new types of algorithms and methods to be used. For example, GPUs are credited as a major factor for deep learning reaching its current prominence. %for numerical programs has 
+		
+	\section{Challenges of GP-GPU Computing}
 	
-		Most applications cannot use GPUs effectively. GPUs
+		General purpose programming languages cannot compile to efficient GPU code. 
+		This means that programmers often have to put substantial effort into porting their code to a GPU language like CUDA, and making the required adjustments to their other code. 
+		%Programming languages depend on models of computation that make code easy to reason about. These models are almost always sequential, deterministic, and assume random access memory. Threads are managed as independent.
 		
-		Programming languages depend on models of computation that make code easy to reason about. These models are almost always sequential, deterministic, and assume random access memory. 
-		Computer scientists tried to make the standard model of computation as fast as possible, inventing various methods such as instruction level parallelism that allowed the programmer to think of code sequentially while in actuality the code was running in parallel.
+		Most applications cannot use GPUs effectively. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively, for example, if it requires too much data flow to and from the CPU. 
+		So when a programmer tries to parallelize an application, and do not have a deep understanding of GPU architecture, they are taking a certain risk. 
 		
-		But eventually, the limits of these methods were made apparent, and it became clear that hardware would need to have some help from the programmer to run code in parallel.
-		Programming languages started supporting multi-threading.
+		
+		%independent, 
+		%Computer scientists tried to make the standard model of computation as fast as possible, inventing various methods such as instruction level parallelism that allowed the programmer to think of code sequentially while in actuality the code was running in parallel.
+		
+		
+		
+		%But eventually, the limits of these methods were made apparent, and it became clear that hardware would need to have some help from the programmer to run code in parallel.
+		%Programming languages started supporting multi-threading.
+		
+	
+	%\section{Current solutions}
+	
+	%	libraries
+		
+	%	languages
+	
+	\section{Our solution}
+	
+		We suggest that a tool can help the programmer understand how their code might perform on a GPU assuming it was ported to a GPU language, or whether traditional CPU multi-threading would be more appropriate. 
+		%This tool would run on sequential CPU code, and would speculate about 
+		Ideally, this tool would not only give results based on how the code currently is, but give information to the programmer which would help them understand how the code could be changed to give better results. This would allow the 
+		
+		
+	\section{Related work}
+	
+		There are two avenues of work which we try to combine in order to make such a tool: workload characterization and dynamic parallelism detection. 
+		
+		Workload characterization measures how applications use hardware features. Che et. al. created the Rodinia benchmark,\footnote{\cite{Che:2010}} to allow researchers to do workload characterization to understand differences between GPUs and CPUs. Workload characterization is described in more detail in Section \ref{s:workload-characht}. 
+		
+		Parallelism detection is 
 		
 	
 	\section{Overall motivation}
@@ -288,9 +327,9 @@
 			\item Level of parallelism. It is kind of difficult to find natural parallelism in arbitrary code to begin with. But when you consider that certain operations (like reductions) are implemented in a highly sequential manner in single threaded programs, but can be rewritten to run in a massively parallel manner. So ideally, we should be able to figure out if they can be written in this way.  (perhaps by keeping track of associative operations)
 		\end{enumerate}
 
-		\subsection{Note about Intel\textsuperscript{\textregistered} Advisor}
+	\subsection{Note about Intel\textsuperscript{\textregistered} Advisor}
 
-		Intel advisor is a very similar tool to what we are using. It's goal is to tell the programmer how they should go about vectorizing and threading their code. This tool can be very effective for both Intel CPUs and Intel Xeon Phi Coprocessors.
+		Intel Advisor is a very similar tool to what we are using. It's goal is to tell the programmer how they should go about vectorizing and threading their code. This tool can be very effective for both Intel CPUs and Intel Xeon Phi Coprocessors.
 
 		Our end goals are quite separate. Intel's goal is to create an interactive workflow that continuously profiles code on the machine as you optimize it. This is impossible for our purposes, as we will only instrument CPU binary code (this is the only code Intel cares about), and not the code of the machine we are interested in making inferences about.
 
@@ -769,9 +808,9 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 	
 		\subsection{Generalized algorithm}
 		
-		To generalize this approach to arbitrary nested loops, the pairwise method keeps track of a global loop stack, a stack of pending and history tables for all of the active loops. With this, we can describe a more precise algorithm for the pairwise method. The significant procedures in this outline will be referenced later as specific implementations are described.
+		To generalize this approach to arbitrary nested loops, the pairwise method keeps track of a global loop stack, a stack of pending and history tables for all of the active loops. With this, we can describe a more precise algorithm for the pairwise method: Algorithm \ref{basic-pariwise}. The significant procedures in this outline will be referenced later as specific implementations are described.
 		
-		\begin{algorithm}[H]
+		\begin{algorithm}
 			\caption{Pairwise method}\label{basic-pariwise}
 			\begin{enumerate}
 				\item When loop $L$ starts, initialize empty pending and history tables for $L$, and push $L$ onto the loop stack.
@@ -911,9 +950,15 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		An interval tree is an augmented binary search tree that allows searches for intervals, instead of single values. An interval tree can efficiently find all intervals stored inside it which overlap with another interval. 
 		
-		Take the following tree below (WIKIPEDIA: \url{https://en.wikipedia.org/wiki/File:Example_of_augmented_tree_with_low_value_as_the_key_and_maximum_high_as_extra_annotation.png}), which stores 5 intervals, including \texttt{[20,30)}, \texttt{[10,15)}, and \texttt{[0,1)}. 
+		Take the tree in Figure \ref{fig:interval-tree}, which stores 5 intervals, including \texttt{[20,30)}, \texttt{[10,15)}, and \texttt{[0,1)}. 
 		
-		\includegraphics[scale=0.5]{interval-tree}
+		%(WIKIPEDIA: \url{https://en.wikipedia.org/wiki/File:Example_of_augmented_tree_with_low_value_as_the_key_and_maximum_high_as_extra_annotation.png})
+		
+		\begin{figure}[h]
+			\caption{Interval Tree}
+			\label{fig:interval-tree}
+			\includegraphics[scale=0.5]{interval-tree}
+		\end{figure}
 		
 		This tree can be queried to find all intervals that overlap with another one, say \texttt{[40,50)} (this will return \texttt{[3,41)}, and \texttt{[29,99)}). Like a ordinary binary search tree, it is self-balancing and allows $O(\log(n))$ inserts and deletes. Finds are $O(m\log(n))$, where $m$ is the number of intervals it finds. 
 		
