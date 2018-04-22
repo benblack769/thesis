@@ -1471,11 +1471,14 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 \chapter{Results}
 	
-	\section{Intro}
+		\section{Intro}
+	
+		We have three main results: the memory improvement by using the compression methods, the potential usefulness of the parallelism detector for the programmer and for analysis, and the potential for matching parallelism with other metrics.
 	
 		\subsection{Running applications}
 		
-		Table \ref{all-applications-table} is a complete table of all the applications which data was collected for, and the command line arguments which were used during collection. 
+		All the results were obtained by running a set of applications.
+		Table \ref{all-applications-table} is a complete table of all the applications which data was collected for, the benchmark it originally came from, and the command line arguments which were used during collection. 
 		
 		Note that when the command line argument is a filename, it does not include the full path to the data file. The data files that are used are all ones that were included in the original benchmark, no new files were created. 
 		
@@ -1528,7 +1531,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		
 		
 		\begin{figure}
-			\caption{Memory compression of applications}
+			\caption{Memory consumption of parallelism detection on applications}
 			\label{fig:mem-comp-plot}
 			\includegraphics[scale=0.7]{plots/overall_plot.png}
 		\end{figure}
@@ -1624,7 +1627,11 @@ for(int i=h_graph_nodes[tid].starting;
 		\begin{figure}
 			\caption{Loop importance and parallelizability}
 			\label{fig:size-iteration-plots}
-			\includegraphics[scale=0.7]{plots/size_iteration_plot.png}
+			
+			\begin{minipage}{0.73\textwidth} % choose width suitably
+				\includegraphics[scale=0.7]{plots/size_iteration_plot.png}
+				{\footnotesize Plotting all loops in all applications, loops have conflicts if any iteration conflicted with any other\par}
+			\end{minipage}
 		\end{figure}
 		
 		This plot shows that there are several loops which can be trivially parallelized for significant application speedup. 
@@ -1648,7 +1655,7 @@ for(int i=h_graph_nodes[tid].starting;
 		$$\text{loop speedup} = \text{loop size} - \frac{\text{loop size}}{\text{iterations per instance}} $$
 		Where the loop size is the proportion of time (approximated by instruction count) spent inside the loop.
 		This speedup estimate assumes no overhead, infinite cores, and uniform loop iterations.
-		These assumptions are extremely optimistic, and so this estimate of loop speedup may also be overly optimistic. But it gives a rough estimate of parallizabililty. Many of the loops which score highly, for example, the main loop of blackscholes, are in fact highly parallelizable. The loops which score poorly, are certainly not useful to parallelize. 
+		These assumptions are extremely optimistic, and so this estimate of loop speedup may also be overly optimistic. But it gives a rough estimate of parallizabililty. Many of the loops which score highly, for example, the main loop of blackscholes, are in fact very useful to parallelize. The loops which score poorly are certainly not useful to parallelize. 
 		So this metric can be interpreted as an upper bound on how much the loop can reduce application performance if parallelized. 
 		
 		%\subsubsection{Substantial parallelism of }
@@ -1658,20 +1665,21 @@ for(int i=h_graph_nodes[tid].starting;
 			
 			\begin{minipage}{0.73\textwidth} % choose width suitably
 				\includegraphics[scale=0.9]{plots/application_idealized_speedup.png}
-				{\footnotesize Speedup by parallelizing a particular loop in the given application assuming no overhead and infinite cores\par}
+				{\footnotesize Speedup by parallelizing a single loop in the given application assuming no overhead and infinite cores\par}
 			\end{minipage}
 		\end{figure}
-		
-		We detected some substantial parallelism in most of the profiled applications. 
+		This estimate of application speedup is not particularly helpful information to give to a programmer, because it is a poor indicator of application parallelizability, but it can give some confidence that the parallelism tool will in fact be somewhat useful for many different applications. 
+				
+		According to this metric, we detected some substantial parallelism in most of the profiled applications. 
 		Figure \ref{fig:application-parr} shows speedup of entire applications assuming idealized parallelization of a single loop in the program. BFS, hotspot and lavaMD show little potential for parallelism, as none of the parallel loops are very important to the application. Others, for example heartwall, LUD, and blackscholes show promise for large performance gains by parallelizing a single loop. Others are more ambiguous, such as swaptions and fluidanimate, because while parallelizing a single loop cannot increase application performance that much, it is possible that parallelizing several loops can in fact improve performance substantially. Since this plot only gives information about a single, loop, it cannot say either way.
 		
-		This estimate of application speedup is not particularly helpful information to give to a programmer, because it is a poor indicator of application parallelizability, but it can give some confidence that the parallelism tool will in fact be somewhat useful for many different applications. 
+
 		
 		\subsubsection{Uniformity of useful parallel loops}
 		
 		It greatly simplifies analysis to assume that important parallel loops are uniform, i.e., all the loop iterations do the same amount of work. While this is true for most loops, some loops have substantial and problematic variability in iteration size that can impact parallelizability. 
 			
-		To see why this is a problem, consider the idealized parallel machine where infinite threads can run in parallel. Consider a loop with 1000 iterations that can run in parallel, but one of those loop iterations takes as much time all the others combined. In this case, overall loop performance can at most be doubled. But if you assume uniformity of iterations, then performance would be calculated to increase by 1000 times, so the actual and predicted speedup would be off by a factor of 500. In real massively parallel machines, this problem can be even worse, since each thread of a massively parallel machine is typically slower than a thread of a CPU. 
+		To see why this is a problem, consider the idealized parallel machine where infinite threads can run in parallel. Consider a loop with 1000 iterations that can run in parallel, but one of those loop iterations takes as much time all the others combined. In this case, overall loop performance can at most be doubled. But if you assume uniformity of iterations, then performance would be calculated to increase by 1000 times, so the actual and predicted speedup would be off by a factor of 500. In real massively parallel machines, this problem can be even worse, since each thread of a massively parallel machine like a GPU is typically slower than a thread of a CPU. So a parallel version of a loop could potentially run much slower than a sequential one. 
 		%So non-uniform loops have serious implications to parallelizability. %This is even more important in the case of massively parallel hardware, like GPUs, since each thread is slower than a GPU thread. 
 		
 		Luckily, for the applications chosen, most loops are roughly uniform. Figure \ref{fig:uniformity-tail-etc} shows a metric of uniformity plotted over the number of iterations per loop instance. The metric chosen is the maximum iteration size over the mean size. Only loops which could speed up the program by 10\% or more assuming idealized parallelism are shown. 
@@ -1687,7 +1695,7 @@ for(int i=h_graph_nodes[tid].starting;
 		%High values indicate some variance in the 
 		
 		\begin{figure}
-			\caption{Uniformity of loop iterations}
+			\caption{Uniformity of loop iterations in important parallel loops}
 			\label{fig:uniformity-tail-etc}
 			
 			\begin{minipage}{0.6\textwidth} % choose width suitably
@@ -1743,6 +1751,7 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		%These assumptions can certainly lead to misleading results, it sometimes corresponds to actual parallelization.
 		\subsection{Future work}
+		\label{s:par-fut-work}
 		
 		This section suggests that this parallelism information can be rather useful to both the programmer and any further characterization of the code. Future work could create a tool which a programmer can easily use to evaluate parallelism. The programmer would provide the inputs to the application, and the analysis tool will tell the programmer where to consider different sorts of parallelism.
 		
@@ -1775,12 +1784,15 @@ for(int i=h_graph_nodes[tid].starting;
 		\begin{itemize}
 			\item Adding more useful information about the loops such as the length and variance of its iteration sizes
 			\item Summarizing the important parallel and possibly parallel loops to investigate further
-			\item Making the output more user friendly
+			%\item Making the output more user friendly
+			\item Making the vague observations in this section about scale of parallelism and variability of loops into precise metrics that could be easily used. 
+			\item  Add an overall score of GPU and CPU parallelism for each loop, perhaps with some kind of performance modeling
 		\end{itemize} 
 	
 	\section{Matching parallelism with other metrics}
 	
-		One goal of this thesis is to try to characterize programs that are effective on CPUs vs GPUs. But as discussed in Section \ref{s:workload-characht}, choosing the right hardware requires investigating other program metrics than just the scale of parallelism. GPUs and CPUs have all sorts of different hardware characteristics, including parallelism models which treat branches differently, memory models which give different importance to predictable memory, and more. To capture some of these differences we collected the metrics described in Table \ref{table:metric-names} for each loop.
+		One goal of this thesis is to try to characterize programs that are effective on CPUs vs. GPUs. But as discussed in Section \ref{s:workload-characht}, choosing the right hardware requires investigating other program metrics than just the scale of parallelism. GPUs and CPUs have all sorts of different hardware characteristics which significantly affect the viability of running certain loops on them. %including parallelism models which treat branches differently, memory models which give different importance to predictable memory, and more. 
+		To capture some of these differences we collected the metrics described in Table \ref{table:metric-names} for each loop.
 		
 		
 		\begin{table}
@@ -1803,10 +1815,12 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		\subsubsection{Variability of metrics in important parallel loops}
 		
-		These metrics will only be important in predicting overall performance if they are not consistent across all the loops. Figure \ref{fig:other-metrics} tries to capture single variable variance by showing how all the important parallel loops score on the different metrics. 
+		These metrics will only be important in predicting overall performance if they are not consistent across all the loops. Figure \ref{fig:other-metrics} tries to capture single variable variance by showing how all the important parallel loops score on the different metrics. While this does not capture overall variance of these performance characteristics, it is a first cut on whether these metrics may turn out to be useful. 
+		
+		Figure \ref{fig:other-metrics} does suggest that there is substantial variance within each of these metrics.
 		
 		\begin{figure}
-			\caption{Other metrics iterations}
+			\caption{Other metrics of important parallel loops}
 			\label{fig:other-metrics}
 			
 			\begin{minipage}{0.6\textwidth} % choose width suitably
@@ -1817,7 +1831,7 @@ for(int i=h_graph_nodes[tid].starting;
 	
 		\subsection{Future work}
 		
-		Unfortunately, due to time restrictions, we were not able to use the metrics to evaluate loop performance on different hardware. Future work would combine metrics similar to these with parallelism summaries discussed in Section \ref{s:important-paralleism}.
+		Unfortunately, due to time restrictions, we were not able to use the metrics to evaluate loop performance on different hardware. Future work would combine metrics similar to these with parallelism summaries discussed in Section \ref{s:important-paralleism}, and build a predictive performance model which would indicate to a programmer if and how to parallelize the loop. Such information could be displayed to the programmer by a tool like is described in Section \ref{s:par-fut-work}.
 
 \chapter*{Conclusion}
          \addcontentsline{toc}{chapter}{Conclusion}
