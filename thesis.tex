@@ -171,10 +171,44 @@
 \chaptermark{Introduction}
 \markboth{Introduction}{Introduction}
 
+	\section{Benefits of Heterogeneous Computing}
+	
+		Traditional general purpose processors are designed to be easy to program while being as fast as possible at many different computation tasks. This allows the vast majority of applications to use general purpose processors exclusively. But some applications, such as network routing or bitcoin mining, require extremely high performance which demands highly specialized hardware that performs a specific set of tasks as quickly as possible, and generally has limited programmability. 
+		
+		Recently, some hardware has fallen in between these two extremes. Of particular note, Graphics Processing Units (GPUs), originally designed to accelerate graphics processing, have since been used for many different applications. They have been especially successful at accelerating numeric computations that are important in the sciences.  GPUs have specialized programming languages, in particular CUDA and OpenCL which allows the programmer to use the GPUs features effectively.
+		This shift towards GPU computing has resulted in large gains of performance and power consumption that has allowed for completely new types of algorithms and methods to be used. %For example, GPUs are credited deep learning %for numerical programs has 
+		
+	\section{Challenges of Heterogeneous Computing}
+	
+		Most applications cannot use GPUs effectively. GPUs
+		
+		Programming languages depend on models of computation that make code easy to reason about. These models are almost always sequential, deterministic, and assume random access memory. 
+		Computer scientists tried to make the standard model of computation as fast as possible, inventing various methods such as instruction level parallelism that allowed the programmer to think of code sequentially while in actuality the code was running in parallel.
+		
+		But eventually, the limits of these methods were made apparent, and it became clear that hardware would need to have some help from the programmer to run code in parallel.
+		Programming languages started supporting multi-threading.
+		
+	
 	\section{Overall motivation}
 
 		%When programmers are first taught to program, 
-		Programming languages model computation as 
+		
+		Programming languages depend on models of computation that make code easy to reason about. These models are almost always sequential, deterministic, and assume random access memory. 
+		For a long time, computer hardware tried to make the standard model of computation as fast as possible, inventing various methods such as instruction level parallelism that allowed the programmer to think of code sequentially while in actuality the code was running in parallel.
+		But eventually, the limits of these methods were found, and to keep software performance improving, languages started including multi-threading features, and software developers were forced to learn how to reason about parallel programming. 
+		Hardware developers started dividing up processors into more and more cores which ran code independently.
+		
+		%But demands for performance are limitless.
+		But these cores were large and complex, had to share memory, and had to communicate with each other quickly, and so today, these chips can only be divided into a couple of dozen of cores at most.
+		Graphics Processing Units (GPUs), which were originally only intended for accelerating processing graphics, were modeled on a different kind of parallel execution of code, which  allowed for much smaller and power efficient cores. GPUs could contain a thousands or more cores, and could process many parallel workloads much faster than general purpose hardware. So programmers started using them for all sorts of tasks. Programming languages like CUDA and OpenCL were introduced to help programmers use GPUs. % General Purpose GPUs (GP-GPUs).
+		
+		General purpose hardware is still important to make complete applications, so applications started to use different kinds hardware within the same application. This is called heterogeneous computing. 
+		
+		
+		
+		%hardware is parallel
+		
+		%Most of common general purpose programming languages model computation as sequential execution of code. Sequential execution is easy to reason about,  %Programmers are trained to think of code as sequential, and 
 		
 
 
