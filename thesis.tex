@@ -173,6 +173,14 @@
 
 	\section{Overall motivation}
 
+		%When programmers are first taught to program, 
+		Programming languages model computation as 
+		
+
+
+
+	\section{Overall motivation}
+
 		In the heterogeneous computing world, there are tools to create software for specific devices. There are also languages which can compile to many different devices (e.g. OpenCL). However, the number of devices is growing, and their characteristics are getting further apart. There will probably never be one language which works for all devices, and all problems. And there is certainly not one available now. So programmers have to write code for different kinds of devices, so that their application can run efficiently. However, programmers have to rely on their knowledge and intuition to figure out what sorts of hardware is appropriate for their application. As the number of different hardware platforms keeps on growing, this puts more and more strain on software developers to become knowledgeable about all sorts of hardware.
 
 		To solve this problem, we suggest making a tool, which can examine CPU code run on a typical workflow, and output suggestions of what kind of hardware different parts of the code can run on.
@@ -1092,14 +1100,16 @@ for(int i = 1; i < 12; i = i + 3){
 				\item PointTable: This table stores non-strided accesses and their instructions. 
 				\item AddressSet: This structure is used as a set of memory addresses, without instructions. It has ordinary set operations, such as union, intersection, set subtraction, and inserting elements. It is used as an optimization only, as it stores strictly less information that the point and stride tables. 
 			\end{itemize}
+		
+			Recall from 
 			
-			These data structures store the content of the pending and history tables, but reads and writes are stored separately. See Figure \ref{fig:loopinstance} for how these tables fit inside the LoopInstance. 
-			
-			\begin{figure}[H]
-				\caption{LoopInstance Layout}
-				\label{fig:loopinstance}
-				\includegraphics[scale=1.0]{LoopData.pdf}
-			\end{figure}
+			%These data structures store the content of the pending and history tables, but reads and writes are stored separately. See Figure \ref{fig:loopinstance} for how these tables fit inside the LoopInstance. 
+%			
+%			\begin{figure}[H]
+%				\caption{LoopInstance Layout}
+%				\label{fig:loopinstance}
+%				\includegraphics[scale=1.0]{LoopData.pdf}
+%			\end{figure}
 			
 			%Given these data structures, new memory accesses are processed as described in Algorithm \ref{new-memory-acc}, loop iteration endings are described in Algorithm \ref{new-loop-iteration}, and loop termination is described in Algorithm \ref{loop-termination}.
 			
@@ -1146,7 +1156,7 @@ for(int i = 1; i < 12; i = i + 3){
 			\caption{New memory accesses}\label{new-memory-acc}
 			When a memory location $m$ is accessed by instruction $i$, and LoopInstance $L$ is at the top of the loop stack,
 			\begin{enumerate}
-				\item If the memory location $m$ is killed by the pending table's AccessSet, do nothing, and skip the rest of the steps. 
+				\item If the memory location $m$ is killed by the pending table's AddressSet, do nothing, and skip the rest of the steps. 
 				\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride, and if so, its stride distance $d$. 
 				%\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
 				\item If $m$ is a stride with stride distance $d$ then add it to the appropriate stride table.
@@ -1260,7 +1270,7 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsubsection{IsParallel}
 		
-			The AccessSet makes this operation simple and fast to compute. The intersection of the history write set and the pending read set is checked. The loop iteration is parallel if and only if that intersection is empty. 
+			The AddressSet makes this operation simple and fast to compute. The intersection of the history write set and the pending read set is checked. The loop iteration is parallel if and only if that intersection is empty. 
 			
 		\subsubsection{FindConflictingInstructions}
 		
@@ -1332,14 +1342,14 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		\subsubsection{Killing}
 		
 			Recall that when a history table is merged into the outer loop's pending table, killed addresses must not be added to the pending table. 
-			The SD$^3$ algorithm removes killed points and strides by a similar algorithm to their conflict-check method. We used AccessSets to do this instead. Given a particular point or stride, we simply use the AccessSet to check if the bytes that point or stride describe are killed. Strides and points are only removed if every byte they reference is killed. This could result in false positive dependencies, but it seems unlikely that partially killed points and strides are an important case. 
+			The SD$^3$ algorithm removes killed points and strides by a similar algorithm to their conflict-check method. We used AddressSets to do this instead. Given a particular point or stride, we simply use the AddressSet to check if the bytes that point or stride describe are killed. Strides and points are only removed if every byte they reference is killed. This could result in false positive dependencies, but it seems unlikely that partially killed points and strides are an important case. 
 %			
-%			AccessSets are first killed with set subtraction, and then unioned into the appropriate set. 
+%			AddressSets are first killed with set subtraction, and then unioned into the appropriate set. 
 %			Stride and Point tables are merged by simply extracting every Point or Stride from the source table, and adding them one at a time into the destination table using the add method . 
 %			
-		\subsection{AccessSet implementation}\label{s:access-set}
+		\subsection{AddressSet implementation}\label{s:access-set}
 			
-			The AccessSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
+			The AddressSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
 			
 			%In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
 			
@@ -1547,7 +1557,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		Next consider the respective memory overhead of stride compression and bit compression. 
 		Recall that in theory, stride compression can also do much better than bit compression. In the best case, stride compression can make profiling memory consumption independent of input size, as the entire working memory can be compressed into a single stride. Of course, this ideal scenario is highly unlikely in real programs, and in the worst case, little memory is accessed in a strided manner, and stride compression does no better than the naive version. Bit compression claims to be less dependent on program characteristics, as it stores blocks of contiguous accesses, but it can also do as poorly as the naive method in cases where different instructions access the same blocks of memory. So determining which method is better needs to be measured on real applications. 
 		
-		As a caveat, note that this stride compression implementation is not completely comparable to SD$^3$, since we added an AccessSet, which SD$^3$ does not store. % this set does not store instruction information, this table is much less memory intensive than the complete. %Although it's indepen bit table is stored as well as the stride table. 
+		As a caveat, note that this stride compression implementation is not completely comparable to SD$^3$, since we added an AddressSet, which SD$^3$ does not store. % this set does not store instruction information, this table is much less memory intensive than the complete. %Although it's indepen bit table is stored as well as the stride table. 
 		
 		Overall, the performance of the methods depends on the applications. Bit compression sometimes performs better and sometimes worse than stride compression. For example, stride compression gets better results on srad, heartwall, and backprop, while bit compression does better on bfs and fluidanimate. But when bit compression performs better, it sometimes performs much better, while stride compression only does better by a little. For example, srad is the application where stride compression beats bit compression by the greatest margin, using only 47\% of the memory of bit compression. Meanwhile, for bfs, bit compression uses only 6.2\% of the memory of stride compression, a huge improvement.
 		
