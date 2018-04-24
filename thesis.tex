@@ -199,7 +199,7 @@
 		
 	\section{Challenges of heterogeneous computing}
 	
-		Heterogeneous computing offers many challenges for the programmer. Since the different hardware have different characteristics and interfaces, different programming languages, libraries, and tools need to be used when coding for each platform. The languages and tools for accelerators are generally much less user friendly than ones for general purpose processors. %, and require some experienc. 
+		Heterogeneous computing offers many challenges for the programmer. Since the different hardware have different characteristics and interfaces, different programming languages, libraries, and tools need to be used when coding for each platform. The languages and tools for accelerators are generally much less user friendly than ones for general purpose processors, and programmers are less familiar with them. %, and require some experienc. 
 		%	
 		This means that programmers often have to put substantial effort into porting their code to a accelerator like a GPU.
 		%programmers need to deeply understand the architecture of each hardware platform. 
@@ -210,9 +210,10 @@
 		
 		%Most applications cannot use even the most general accelerators effectively. If they could, then it could not be called an accelerator. 
 		
-		Even worse, there is no guarantee that an application will run faster on an accelerator. Take a GPU as an example. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively because the application depends on certain hardware characteristics of general purpose processors that are different on GPUs. %depends on features that are absent from GPUs, like efficient handling of divergent branches. 
-		So when a programmer tries to parallelize an application, and does not have a deep understanding of GPU architecture, they are taking a certain risk. 
+		Even worse, there is no guarantee that an application will run faster on an accelerator. Take a GPU as an example. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively because the application depends on certain hardware characteristics of general purpose processors that are different on GPUs. Programmers are often be unaware of ways to best use the hardware. %depends on features that are absent from GPUs, like efficient handling of divergent branches. 
+		So when a programmer tries to parallelize an application, and does not have a deep understanding of GPU architecture, they are taking a certain risk: all that extra work may be for nothing. 
 		
+		Since the benefits of heterogeneous computing are potentially so large, reducing the risks and making heterogeneous programming more accessible to non-experts could bring significant benefits.
 		
 		
 		%independent, 
@@ -224,17 +225,17 @@
 		%Programming languages started supporting multi-threading.
 		
 		
-	\section{GPGPU}
-		
-		So there is a trade off between generality and performance, and different hardware take different positions on this tradeoff. %Some hardware is a compromise between generality and performance.  % fallen in between these two extremes. Of particular note,
-		Graphics Processing Units (GPUs) are a type of specialized hardware that was developed to speed up graphics for video games. GPUs have become extremely widespread, being ubiquitous in desktops, laptops, and phones. % This allows a GPU to run certain algorithms much  %But as they became more general to support different types of procedures for graphics, they became able to 
-		While GPUs were designed for video games, they have since been used for many different applications. To reflect this, they are sometimes called general purpose GPUs, or GP-GPUs.
-		Programming languages such as CUDA and OpenCL have been developed to make programming GPU procedures easier while allowing access to the GPU hardware features. These languages allow the programmer to use the GPUs features effectively to accelerate their programs.
-		To use a GPU, an application would send data and code to the GPU, which would use the code to process the data and send back the results. Since the application uses different hardware to achieve a single goal, this is called heterogeneous computing. 
-		
-		GPUs have been especially successful at accelerating numeric computations that are important in the sciences (for example, matrix multiplication). 
-		This shift towards GPU computing has resulted in an order of magnitude gain in performance and power consumption of certain scientific applications that has allowed for completely new types of algorithms and methods to be used. For example, GPUs are credited as a major factor for deep learning reaching its current prominence. %for numerical programs has 
-		
+%	\section{GPGPU}
+%		
+%		So there is a trade off between generality and performance, and different hardware take different positions on this tradeoff. %Some hardware is a compromise between generality and performance.  % fallen in between these two extremes. Of particular note,
+%		Graphics Processing Units (GPUs) are a type of specialized hardware that was developed to speed up graphics for video games. GPUs have become extremely widespread, being ubiquitous in desktops, laptops, and phones. % This allows a GPU to run certain algorithms much  %But as they became more general to support different types of procedures for graphics, they became able to 
+%		While GPUs were designed for video games, they have since been used for many different applications. To reflect this, they are sometimes called general purpose GPUs, or GP-GPUs.
+%		Programming languages such as CUDA and OpenCL have been developed to make programming GPU procedures easier while allowing access to the GPU hardware features. These languages allow the programmer to use the GPUs features effectively to accelerate their programs.
+%		To use a GPU, an application would send data and code to the GPU, which would use the code to process the data and send back the results. Since the application uses different hardware to achieve a single goal, this is called heterogeneous computing. 
+%		
+%		GPUs have been especially successful at accelerating numeric computations that are important in the sciences (for example, matrix multiplication). 
+%		This shift towards GPU computing has resulted in an order of magnitude gain in performance and power consumption of certain scientific applications that has allowed for completely new types of algorithms and methods to be used. For example, GPUs are credited as a major factor for deep learning reaching its current prominence. %for numerical programs has 
+%		
 	
 	%\section{Current solutions}
 	
@@ -244,9 +245,17 @@
 	
 	\section{Our solution}
 	
+		
+		This thesis focuses on two small parts of the larger challenge of heterogeneous computing:
+		
+		\begin{enumerate}
+			\item Determining whether certain code structures are parallel or not.
+			\item If so, then determining which kind of hardware would be more appropriate: CPU or GPU. 
+		\end{enumerate}
+	
 		We suggest creating a tool which can help the programmer understand how their code might perform on a many-core processor and a GPU.
 		
-		First and foremost, this tool will need to detect whether parallelism is available. 
+		%First and foremost, this tool will need to detect whether parallelism is available. 
 		
 		assuming it was ported to a GPU language, or whether traditional CPU multi-threading would be more appropriate. 
 		%This tool would run on sequential CPU code, and would speculate about 
