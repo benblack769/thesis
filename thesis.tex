@@ -245,22 +245,22 @@
 	
 	\section{Our solution}
 	
+		This thesis focuses on a small part of the larger challenge of heterogeneous computing. First, we focus our attention only on CPUs and GPUs, and ignore other types of hardware. This is only because we are restricted by time, we hope that our work would easily extend to other highly programmable accelerators like FPGAs.
 		
-		This thesis focuses on two small parts of the larger challenge of heterogeneous computing:
+		%This thesis focuses on two small parts of the larger challenge of heterogeneous computing:
+		
+		Within this focus on CPUs and GPUs, this thesis focuses only on the identification problem: 
 		
 		\begin{enumerate}
 			\item Determining whether certain code structures are parallel or not.
 			\item If so, then determining which kind of hardware would be more appropriate: CPU or GPU. 
 		\end{enumerate}
 	
-		We suggest creating a tool which can help the programmer understand how their code might perform on a many-core processor and a GPU.
-		
-		%First and foremost, this tool will need to detect whether parallelism is available. 
-		
-		assuming it was ported to a GPU language, or whether traditional CPU multi-threading would be more appropriate. 
+		We suggest creating a tool which can help the programmer understand how their code might perform on a many-core processor and a GPU assuming the code was ported to a GPU language. %, or whether traditional CPU multi-threading would be more appropriate. 
 		%This tool would run on sequential CPU code, and would speculate about 
-		Ideally, this tool would not only give results based on how the code currently is, but give information to the programmer which would help them understand how the code could be changed to give better results. This would allow the 
+		Ideally, this tool would not only give results based on how the code currently is, but give information to the programmer which would help them understand how the code could be changed to give better results on the types of hardware. 
 		
+		The results of this tool should allow an average programmer to make better decisions and assume less risk allowing them to potentially better accelerate their applications. 
 		
 	\section{Related work}
 	
