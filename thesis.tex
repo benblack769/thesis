@@ -685,7 +685,7 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 		
 		
 		
-	\section{Prior work on optimizing the pairwise method}
+	\section{Prior work on optimizing the pairwise method}\label{s:optimize-pairwise}
 		
 		Naive implementations of the pairwise method have a severe memory overhead that limits the usefulness of the approach. Kim et al.'s work mitigates this problem by reducing memory consumption through compression. Our work follows the mechanism used in the SD$^3$ paper to reduce memory overhead. This section gives an overview of the memory considerations involved with the pairwise method and prior attempts to fix this by compressing the working memory. 
 		
@@ -815,15 +815,14 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		Stride compression is effective because many memory intensive procedures in real applications access memory in a strided fashion. Bit compression is effective because program memory is locally dense, meaning if memory is accessed in one location, nearby memory addresses are usually also valid program memory which will be accessed eventually. This local density property is virtually guaranteed by modern operating systems and hardware, and so it is not as dependent on the program's structure as stride compression. 
 		
-		\subsection{Implementation of a bit compressed integer set}	
+		\subsection{Implementation of a bit compressed integer set}
 		
-		
-		
-		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set will be implemented by a hash table where each item represents a fixed size set of memory. Figure \ref{fig:bit-local-density} shows the the three different types of sets storing the same information. %the difference between what information the three types of sets store. 
+		A locally dense set implementation should use the advantages of dense and sparse set implementations. 
+		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set should be implemented by a hash table where each entry is a bit array that represents a contiguous range of integers starting at a particular location. Figure \ref{fig:bit-local-density} shows the the three different types of sets storing the set $\{0, 3, 10\}$.
 		
 		
 		\begin{figure}[H]
-			\caption{Table comparisons}
+			\caption{Representations of the set $\{0, 3, 10\}$}
 			\label{fig:bit-local-density}
 			\includegraphics[scale=0.8]{BitSetComparison.pdf}
 		\end{figure}
@@ -832,17 +831,29 @@ for(int i = 1; i < 12; i = i + 3){
 		
 \chapter{Implementation}
 
+
+	%There are several components that we implemented. 
+	This chapter will first discuss workload characterization concepts, introducing the relevant hardware concepts, and then discussing our method of collecting specific characteristics in formats which can be matched with parallelism data. 
+	
+	To detect parallelism and also to compare the compression methods outlined in Section \ref{s:optimize-pairwise}, we implemented three different versions of the pairwise method: one based on stride compression, one based on bit compression, and one based on the naive implementation. This chapter will describe the stride compression and bit compression algorithms in detail. 
+	
+
 	\section{Introduction to workload characterization}
 		\label{s:workload-characht}
 	
 		Workload characterization measures how applications use hardware features. %Workload characterization uses dynamic analysis to collect the runtime characteristics of a set of applications. %running on some set of hardware and of the software. 
-		Traditionally, hardware researchers are interested in the sorts of hardware characteristics that are important to application performance. They use workload characterization to understand how trade-offs in hardware design would affect various applications' performance. To accomplish this, they collect metrics on the applications they want to optimize. These metrics inform decisions about the of hardware trade-offs hardware engineers are considering. 
+		Hardware researchers are interested in the sorts of hardware characteristics that are important to application performance. They use workload characterization to understand how trade-offs in hardware design would affect various applications' performance. To accomplish this, they collect metrics on the applications they want to optimize. These metrics inform decisions about the of hardware trade-offs that hardware engineers are considering. 
 		
-		We are interested in a related question: the application characteristics that can help the programmer choose between different established hardware platforms. We use workload characterization to understand the characteristics of single threaded CPU programs that are indicators of performance on other general purpose hardware, such as GPUs. We gathered applications and platform independent metrics that indicate important differences between the different hardware platforms. 
+		We are interested in a related question: What are the application characteristics that can help the programmer choose between different established hardware platforms? We use workload characterization to understand the platform independent characteristics of single threaded CPU programs that are indicators of performance for traditional multiprocessors and GPUs. 
+		
+		In this work, we examine a variety of applications that are best fit for CPUs and GPUs and collect platform independent metrics that help indicate which type of hardware that parts of the application are best fit for. %ay be important to distinguishing between
+		%In thi gathered applications and platform independent metrics that indicate important differences between the different hardware platforms. 
 		
 		\subsection{Important hardware characteristics under consideration}
 		
-		This thesis identifies several different hardware features as important, and attempts to capture in metrics. 
+		%This thesis identifies several different hardware features as important, and attempts to capture in metrics. 
+		
+		In the following sections we explain some important hardware characteristics in traditional multiprocessors and GPUs and the metrics that measure some aspect of these characteristics. 
 		
 		\subsubsection{Scale of Parallelism}
 		
@@ -856,6 +867,14 @@ for(int i = 1; i < 12; i = i + 3){
 		%GPUs can run hundreds of threads have hundreds of are only useful when 
 		
 		
+		\subsubsection{Parallelism Model}
+		
+		At a low level, GPUs execute threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
+		
+		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. 
+		
+		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
+		
 		\subsubsection{Predictability of memory accesses}
 		
 		
@@ -867,14 +886,6 @@ for(int i = 1; i < 12; i = i + 3){
 		We use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). 
 		
 		% Then, we simply count the number of accesses which are of certain stride lengths, including zero length strides, and those that cannot be detected as strides. 
-		
-		\subsubsection{Parallelism Model}
-		
-		At a low level, GPUs execute threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
-		
-		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. 
-		
-		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
 		
 		\subsubsection{Inter-thread vs Intra-thread memory sharing}
 		
