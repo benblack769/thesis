@@ -191,22 +191,28 @@
 		This limitation was caused by the cores being general purpose. But hardware does not need to be general purpose. 
 		Individual applications often have a specific type of procedure that consumes the vast majority of the computing power. For these applications, hardware developers can build an accelerator that runs that procedure very efficiently, but does cannot run other types of code. The general purpose processor running the application can use the accelerator to compute that procedure quickly, and perform the rest of the computation itself. Encryption and decryption are commonly done with accelerators. 
 		
-		Some hardware takes a compromise between generality and performance. Most notably, Graphics Processing Units (GPUs), originally designed to accelerate graphics in video games, have become general enough to run many types of computations, and now run many numeric scientific calculations. 
+		Some hardware takes a compromise between generality and performance. Notably, Graphics Processing Units (GPUs), originally designed to accelerate graphics in video games, have become general enough to run many types of computations, and now run many important numeric scientific calculations. 
 		
 		This concept of running a single application of different hardware is called heterogeneous computing. 
 		
 		%Sometimes, hardware can be built to run specific applications. Tasks like network routing or bitcoin mining require extremely high performance, and so hardware was developed to run specific procedures which these applications rely on. But this hardware is often useless for other applications. This hardware also cannot be used in user facing applications because the user usually does not have access to the hardware.  % which demands highly specialized hardware that performs a specific set of tasks as quickly as possible, and generally has limited programmability. 
 		
-	\section{Challenges of heterogeneous Computing}
+	\section{Challenges of heterogeneous computing}
 	
-		
-	
-		General purpose programming languages cannot compile to efficient GPU code. 
-		This means that programmers often have to put substantial effort into porting their code to a GPU language like CUDA, and making the required adjustments to their other code. 
+		Heterogeneous computing offers many challenges for the programmer. Since the different hardware have different characteristics and interfaces, different programming languages, libraries, and tools need to be used when coding for each platform. The languages and tools for accelerators are generally much less user friendly than ones for general purpose processors. %, and require some experienc. 
+		%	
+		This means that programmers often have to put substantial effort into porting their code to a accelerator like a GPU.
+		%programmers need to deeply understand the architecture of each hardware platform. 
+		%
+		%General purpose programming languages cannot compile to efficient GPU code. 
+	 % language like CUDA, and making the required adjustments to their other code. 
 		%Programming languages depend on models of computation that make code easy to reason about. These models are almost always sequential, deterministic, and assume random access memory. Threads are managed as independent.
 		
-		Most applications cannot use GPUs effectively. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively, for example, if it requires too much data flow to and from the CPU. 
-		So when a programmer tries to parallelize an application, and do not have a deep understanding of GPU architecture, they are taking a certain risk. 
+		%Most applications cannot use even the most general accelerators effectively. If they could, then it could not be called an accelerator. 
+		
+		Even worse, there is no guarantee that an application will run faster on an accelerator. Take a GPU as an example. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively because the application depends on certain hardware characteristics of general purpose processors that are different on GPUs. %depends on features that are absent from GPUs, like efficient handling of divergent branches. 
+		So when a programmer tries to parallelize an application, and does not have a deep understanding of GPU architecture, they are taking a certain risk. 
+		
 		
 		
 		%independent, 
@@ -238,7 +244,11 @@
 	
 	\section{Our solution}
 	
-		We suggest that a tool can help the programmer understand how their code might perform on a GPU assuming it was ported to a GPU language, or whether traditional CPU multi-threading would be more appropriate. 
+		We suggest creating a tool which can help the programmer understand how their code might perform on a many-core processor and a GPU.
+		
+		First and foremost, this tool will need to detect whether parallelism is available. 
+		
+		assuming it was ported to a GPU language, or whether traditional CPU multi-threading would be more appropriate. 
 		%This tool would run on sequential CPU code, and would speculate about 
 		Ideally, this tool would not only give results based on how the code currently is, but give information to the programmer which would help them understand how the code could be changed to give better results. This would allow the 
 		
@@ -252,6 +262,18 @@
 		Parallelism detection analyzes which parts of sequential code might be run in parallel. Historically, applications of parallelism detection have been limited to CPUs. 
 		A commercial application of parallelism detection is Intel\textsuperscript{\textregistered} Advisor. The tool tells programmers which loops in the code might be parallelized, how they might be parallelized, and if not, where the problems are that are stopping it from being parallelized. 
 		Intel Advisor currently costs around \$1600 and is closed source, so we will be building our own tool similar to this one, but with fewer features. 
+	
+	\section{Parts of thesis}
+	
+		This thesis makes several contributions:
+		
+		\begin{enumerate}
+			\item Built a tool to detect parallelism for loops. %a par
+			\item Built a tool to collect a variety of metrics for our workload characterization.
+			\item Analyze the possible effectiveness of these tools to distinguish between GPU and CPU oriented applications.
+		\end{enumerate}
+	
+	`	We hope these will make progress towards the eventual goal.
 	
 	\section{Overall motivation}
 
