@@ -857,9 +857,14 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsubsection{Scale of Parallelism}
 		
-		GPUs will not be faster than CPUs unless there is a high degree of parallelism, and substantial work to be done. GPUs have hundreds of cores, where CPUs at most two dozen or so. However, CPU cores are much faster. So GPUs will not be effective unless the work can be split over hundreds of threads. In addition, each kernel call must do substantial work, because the overhead of calling kernels is sometimes very high.  
+		%GPUs will not be faster than CPUs unless there is a high degree of parallelism, and substantial work to be done.
+		GPUs will not be able to execute procedures faster than CPUs unless that procedure has a high degree of parallelism. 
+		GPUs have hundreds of small cores, where CPUs at most two dozen or so larger cores. So CPUs are better at processing a small number of tasks. So GPUs will not be effective unless the work can be split over hundreds of threads. To capture this, we suggest using the number of iterations in parallel loops.
 		
-		We suggest using the number of iterations in parallel loops, as well as the number of instructions each of those iterations contains to measure the scale of parallelism.
+		In addition, using a GPU has a significant overhead, meaning it takes substantial time to run any computation on a GPU, no matter how trivial. This is because when a GPU is used, the CPU typically has to send data and code to the GPU, the GPU runs the computation, and then sends back the data. On a traditional multiprocessor, the overhead of using threads is much smaller. %This communication is slow compared to on-chip multiprocessing.
+		
+		Since each kernel call must do substantial work to be effective on a GPU, %, because the overhead of calling kernels is sometimes very high.  
+		we suggest collecting the number of instructions each loop iteration contains to make sure there is substantial work to be done by the loop.
 		% memory must be transfered back and forth between In addition, if the computation is extremely simple, say,  sometimes the cost of tran
 		
 		%GPUs are only useful when the algorithm can be divided into many threads, each of which has substantial content.
@@ -869,18 +874,17 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsubsection{Parallelism Model}
 		
-		At a low level, GPUs execute threads in groups called warps. Warps have an SIMD (single instruction multiple data) model of execution, meaning that each thread in the warp executes instructions in lock-step. This implies that different threads in the same warp cannot execute different branch paths at the same time \footnote{\cite{Fung:2007:DWF:1331699.1331735}}. This performance hazard is called  branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
+		At a low level, GPUs execute threads in groups called warps. Warps have an SIMT (single instruction multiple thread) model of execution, meaning that each thread in the warp executes instructions simultaneously in lock-step. Due to this hardware design, when GPU threads in a warp execute different instructions due to a branch, they cannot do so simultaneously, so instead the different instructions are executed serially.\footnote{\cite{Fung:2007:DWF:1331699.1331735}} This sequential processing of branch paths creates a performance hazard called branch divergence. Handling branch divergence is time consuming on GPUs, so performance suffers significantly when branch paths differ within a warp.
 		
-		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. 
+		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. Consequently, parallel code which executes different branch segments may run better on CPUs. 
 		
-		To account for this performance difference, we collected a count of the number of conditional branches encountered, and the number of time the path of that branch changed. 
+		To account for this performance difference, we collect a count of the number of conditional branches encountered, and the number of times the path of that branch changed. These branch changes captures the probability that different threads in a GPU warp will take different branch paths. 
 		
 		\subsubsection{Predictability of memory accesses}
 		
-		
-		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed efficiently, while unpredictable memory accesses suffer from high latency, and stall the instruction pipeline. 
+		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed from GPU memory to the cores efficiently, while unpredictable memory accesses stall the instruction pipeline because they take longer to access. 
 		%[CITATION???] possibly file:///C:/Users/weepi/Documents/thesis/papers/CCWS.pdf 
-		In contrast, CPUs are much better at handling unpredictable memory, since they have much larger caches. % also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
+		In contrast, CPUs have larger caches that accommodate data reuse, and so are much better at handling unpredictable memory if that memory fits inside the caches. % also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
 		
 		We chose to capture this performance difference by measuring the number and length of strided accesses. 
 		We use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for an design). 
@@ -889,10 +893,10 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsubsection{Inter-thread vs Intra-thread memory sharing}
 		
-		CPUs theads have much larger cache capacity than GPU threads, since there are simply many more GPU threads active at a given time.\footnote{\cite{Jia:6835938}} This means that GPU threads cannot rely on caches to exploit temporal locality to the same degree that CPU threads can. Instead, GPU caches effectively exploit cross-thread locality. 
+		CPUs theads have much larger cache capacity than GPU threads, since there are simply many more GPU threads active at a given time.\footnote{\cite{Jia:6835938}} This means that GPU threads cannot rely on caches to exploit temporal or spacial locality to the same degree that CPU threads can. Instead, GPU caches effectively exploit cross-thread locality. 
 		
 		To capture this, we measure the amount of memory shared between loop iterations vs reaccessed within a single iteration.
-		We construct maps of the memory footprint of the loop and each of its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iteration as well whole instance. %From that, the number of shared bytes between threads 
+		We construct maps of the memory footprint of the loop and each of its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iteration as well whole loop instance. %From that, the number of shared bytes between threads 
 		
 %		
 %		We capture this 
@@ -922,7 +926,7 @@ for(int i = 1; i < 12; i = i + 3){
 	
 	\section{Metrics}
 		
-		An important contribution of this paper is using a metric of parallelizability in workload characterization. 
+		An important contribution of this thesis is using a metric of parallelizability in workload characterization. 
 		We created metrics in order to make use of this metric. 
 		In particular, since we evaluate loop level parallelizability, we chose to collect all other metrics at the loop level. 
 		
