@@ -813,9 +813,11 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsection{Basis of bit compression}
 		
-		Stride compression is effective because many memory intensive procedures in real applications access memory in a strided fashion. Bit compression is effective because program memory is locally dense, meaning if memory is accessed in one location, nearby memory addresses are usually also valid program memory which will be accessed eventually. This property is virtually guaranteed by most modern operating systems, and so it is not as dependent on the program's structure as stride compression. 
+		Stride compression is effective because many memory intensive procedures in real applications access memory in a strided fashion. Bit compression is effective because program memory is locally dense, meaning if memory is accessed in one location, nearby memory addresses are usually also valid program memory which will be accessed eventually. This local density property is virtually guaranteed by modern operating systems and hardware, and so it is not as dependent on the program's structure as stride compression. 
 		
 		\subsection{Implementation of a bit compressed integer set}	
+		
+		
 		
 		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set will be implemented by a hash table where each item represents a fixed size set of memory. Figure \ref{fig:bit-local-density} shows the the three different types of sets storing the same information. %the difference between what information the three types of sets store. 
 		
@@ -1019,7 +1021,8 @@ for(int i = 1; i < 12; i = i + 3){
 			\begin{itemize}
 				\item StrideTable: This table stores strided accesses and their instructions. Strides can be added efficiently to this table.
 				\item PointTable: This table stores non-strided accesses called points and their instructions. 
-				\item AddressSet: This structure is a set of memory addresses.%, without instructions. It has ordinary set operations, such as union, intersection, set subtraction, and inserting elements. It is used as an optimization only, as it stores strictly less information that the point and stride tables. 
+				\item AddressSet: This structure is a set of memory addresses.
+				This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. %, without instructions. It has ordinary set operations, such as union, intersection, set subtraction, and inserting elements. It is used as an optimization only, as it stores strictly less information that the point and stride tables. 
 			\end{itemize}
 		
 			
@@ -1050,7 +1053,7 @@ for(int i = 1; i < 12; i = i + 3){
 		\end{algorithm}
 	
 		
-		\begin{figure}[h]
+		\begin{figure}
 			\caption{Adding accesses}
 			\label{fig:add-access}
 			\includegraphics[scale=0.6]{add_access.pdf}
@@ -1069,7 +1072,7 @@ for(int i = 1; i < 12; i = i + 3){
 			%Recall that Points are specified by instruction address, memory address, and access mode (read or write). 
 			%In Figure \ref{fig:point-table}, you can see that the a Point is stored for each instruction and memory address. 
 			
-			\begin{figure}[h]
+			\begin{figure}
 				\caption{Point Table}
 				\label{fig:point-table}
 				\includegraphics[scale=0.8]{point_data.pdf}
@@ -1088,7 +1091,7 @@ for(int i = 1; i < 12; i = i + 3){
 			When possible, strides need to be merged into existing strides in the table. This is critical for compression (see section \ref{sse:stride-descr}.5). The StrideTable is designed to make this process simple and efficient. 
 			At a high level, the StrideTable is a set of ordered sets of strides (see Figure \ref{fig:stride-table}). %The outer set ensures that a particular inner set contains only strides which are mergeable if they adjoin. The inner ordered set is used to check if the strides do adjoin, in which case, they are mergeable.
 			
-			\begin{figure}[h]
+			\begin{figure}
 				\caption{Stride Table}
 				\label{fig:stride-table}
 				\includegraphics[scale=0.8]{stride_data.pdf}
@@ -1138,16 +1141,17 @@ for(int i = 1; i < 12; i = i + 3){
 			
 		\subsection{AddressSet implementation}\label{s:access-set}
 			
-			The AddressSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
+			%The AddressSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
 			
 			%In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
 			
+			The AddressSet
 			Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this integer set efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
 			
 			\begin{figure}[H]
 				\caption{AddressSet data structure}
 				\label{fig:bitset}
-				\includegraphics[scale=0.8]{bit_data.pdf}
+				\includegraphics[scale=1.0]{bit_data.pdf}
 			\end{figure}
 				
 			%The Bit table stores a set of overall memory accesses, independently of the instruction it was accessed.
