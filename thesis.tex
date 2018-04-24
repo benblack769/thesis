@@ -186,7 +186,7 @@
 		For a long time, computer hardware tried to make the standard model of computation as fast as possible, inventing various methods such as instruction level parallelism that allowed the programmer to think of code sequentially while in actuality the code was running in parallel.
 		But these methods could not scale well and eventually, the limits of these methods were found. To keep software performance improving, hardware moved to a many-core model where several cores executed code independently. Programming languages started including multi-threading features, and software developers were forced to learn how to reason about parallel programming. 
 		
-		But because each core of a many-core processor needs to execute general purpose code efficiently, each core is large, complex, and power intensive, so relatively few cores can be placed on a single chip. Today, high end many-core processors typically have at most two dozen cores. 
+		But because each core of a many-core processor needs to execute general purpose code efficiently, each core is large, complex, and power hungry, so relatively few cores can be placed on a single chip. Today, high end many-core processors typically have at most two dozen cores. 
 		
 		This limitation was caused by the cores being general purpose. But hardware does not need to be general purpose. 
 		Individual applications often have a specific type of procedure that consumes the vast majority of the computing power. For these applications, hardware developers can build an accelerator that runs that procedure very efficiently, but does cannot run other types of code. The general purpose processor running the application can use the accelerator to compute that procedure quickly, and perform the rest of the computation itself. Encryption and decryption are commonly done with accelerators. 
@@ -210,7 +210,7 @@
 		
 		%Most applications cannot use even the most general accelerators effectively. If they could, then it could not be called an accelerator. 
 		
-		Even worse, there is no guarantee that an application will run faster on an accelerator. Take a GPU as an example. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively because the application depends on certain hardware characteristics of general purpose processors that are different on GPUs. Programmers are often be unaware of ways to best use the hardware. %depends on features that are absent from GPUs, like efficient handling of divergent branches. 
+		Even worse, there is no guarantee that an application will run faster on an accelerator. Take a GPU as an example. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively because the application depends on certain hardware characteristics of general purpose processors that are different on GPUs. %Programmers are often be unaware of ways to best use the hardware. %depends on features that are absent from GPUs, like efficient handling of divergent branches. 
 		So when a programmer tries to parallelize an application, and does not have a deep understanding of GPU architecture, they are taking a certain risk: all that extra work may be for nothing. 
 		
 		Since the benefits of heterogeneous computing are potentially so large, reducing the risks and making heterogeneous programming more accessible to non-experts could bring significant benefits.
@@ -271,18 +271,22 @@
 		Parallelism detection analyzes which parts of sequential code might be run in parallel. Historically, applications of parallelism detection have been limited to CPUs. 
 		A commercial application of parallelism detection is Intel\textsuperscript{\textregistered} Advisor. The tool tells programmers which loops in the code might be parallelized, how they might be parallelized, and if not, where the problems are that are stopping it from being parallelized. 
 		Intel Advisor currently costs around \$1600 and is closed source, so we will be building our own tool similar to this one, but with fewer features. 
+		
+		%This thesis attempts to combine these two 
 	
 	\section{Parts of thesis}
 	
 		This thesis makes several contributions:
 		
 		\begin{enumerate}
-			\item Built a tool to detect parallelism for loops. %a par
-			\item Built a tool to collect a variety of metrics for our workload characterization.
+			\item Built a tool to detect parallelism in loops. 
+			\item Built a tool to collect a variety of metrics for our workload characterization. %, and match these metrics with the parallelism.
 			\item Analyze the possible effectiveness of these tools to distinguish between GPU and CPU oriented applications.
 		\end{enumerate}
 	
 	`	We hope these will make progress towards the eventual goal.
+	
+		WHY ARE THESE PARTS IMPORTANT!!!!!!!!!!!!
 	
 		
 \chapter{Dynamic parallelism detection}
@@ -1021,11 +1025,11 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			%These data structures store the content of the pending and history tables, but reads and writes are stored separately. See Figure \ref{fig:loopinstance} for how these tables fit inside the LoopInstance. 
 			
-			\begin{figure}[H]
-				\caption{LoopInstance Layout}
-				\label{fig:loopinstance}
-				\includegraphics[scale=0.7]{loop-instance.pdf}
-			\end{figure}
+%			\begin{figure}[H]
+%				\caption{LoopInstance Layout}
+%				\label{fig:loopinstance}
+%				\includegraphics[scale=0.7]{loop-instance.pdf}
+%			\end{figure}
 			
 			%Given these data structures, new memory accesses are processed as described in Algorithm \ref{new-memory-acc}, loop iteration endings are described in Algorithm \ref{new-loop-iteration}, and loop termination is described in Algorithm \ref{loop-termination}.
 			
@@ -1073,13 +1077,20 @@ for(int i = 1; i < 12; i = i + 3){
 			When a memory location $m$ is accessed by instruction $i$, and LoopInstance $L$ is at the top of the loop stack,
 			\begin{enumerate}
 				\item If the memory location $m$ is killed by the pending table's AddressSet, do nothing, and skip the rest of the steps. 
+				\item Add the bytes accessed by $m$ to the appropriate AddressSet.
 				\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride, and if so, its stride distance $d$. 
 				%\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
 				\item If $m$ is a stride with stride distance $d$ then add it to the appropriate stride table.
 				\item If $m$ is not a stride, add it to the appropriate point table. 
-				\item Add the bytes accessed by $m$ to the appropriate AddressSet.
 			\end{enumerate} 
 		\end{algorithm}
+	
+		
+		\begin{figure}[h]
+			\caption{Adding accesses}
+			\label{fig:add-access}
+			\includegraphics[scale=0.6]{add_access.pdf}
+		\end{figure}
 		
 		
 		\subsubsection{Stride Detection}
@@ -1163,7 +1174,7 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsection{Checking conflicts}
 			
-			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures.
+			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory. To improve performance, FindConflictingInstructions is only run when IsParallel reports some conflict, as if there is no conflict then there couldn't be conflicts. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures.
 			
 			\begin{figure}
 				\caption{Conflict-Check outline}
