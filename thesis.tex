@@ -1031,43 +1031,7 @@ for(int i = 1; i < 12; i = i + 3){
 %				\includegraphics[scale=0.7]{loop-instance.pdf}
 %			\end{figure}
 			
-			%Given these data structures, new memory accesses are processed as described in Algorithm \ref{new-memory-acc}, loop iteration endings are described in Algorithm \ref{new-loop-iteration}, and loop termination is described in Algorithm \ref{loop-termination}.
 			
-%			
-%			\begin{algorithm}
-%				\caption{Finishing a loop iteration}\label{new-loop-iteration}
-%				When an iteration of loop $L$, with LoopInstance $I$ finishes,
-%				\begin{enumerate}
-%					\item Merge pending table contents into history table
-%					\begin{enumerate}
-%						\item Add every point and stride in the pending table into the corresponding point and stride tables of the history table
-%						\item Union the pending AccessSets into the corresponding history AccessSets.
-%						\item Clear the entire PendingTable.
-%					\end{enumerate}
-%					\item Check for conflicts between the pending and history tables
-%					\begin{enumerate}
-%						\item Determine if the iteration can be run in parallel by checking the AccessSets. if the intersection of the pending table's read AccessSet and the history table's write AccessSet is empty.
-%						\item If the loop iteration is not parallel, find the pairs of instructions that conflict by
-%						\begin{enumerate}
-%							\item Get the list of all points/strides in the read pending table, and compare it the list of all points/strides in the write history table, and find a list of pairs of overlapping points/strides.
-%							\item Filter out the points/strides which are not actually conflicting.
-%						\end{enumerate}
-%					\end{enumerate}
-%				\end{enumerate}
-%			\end{algorithm}
-
-%
-%			\begin{algorithm}
-%				\caption{Upon loop termination}\label{loop-termination}
-%				
-%				When loop $L$ terminates, with LoopInstance $I$ on the top of the LoopStack, and LoopInstance $I^\prime$ is the next highest on the stack,
-%				\begin{enumerate}
-%					\item Remove all strides and points from the history table of $I$ which are killed by the pending table of $I^\prime$.
-%					\item Merge history table contents into pending table.
-%					\item Pop $I$ off the LoopStack.
-%				\end{enumerate}
-%			\end{algorithm}
-%		
 		\subsection{Adding accesses}\label{s:add-accesses}
 		
 		Algorithm \ref{new-memory-acc} describes the high level description of how new memory accesses are put in the pending table. % a lot of details out. These details will be explained here. 
@@ -1171,10 +1135,50 @@ for(int i = 1; i < 12; i = i + 3){
 			%Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stride-table}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
 			%These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree.
+			
+		\subsection{AddressSet implementation}\label{s:access-set}
+			
+			The AddressSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
+			
+			%In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
+			
+			Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this integer set efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
+			
+			\begin{figure}[H]
+				\caption{AddressSet data structure}
+				\label{fig:bitset}
+				\includegraphics[scale=0.8]{bit_data.pdf}
+			\end{figure}
+				
+			%The Bit table stores a set of overall memory accesses, independently of the instruction it was accessed.
+			
+			%Points and strides store which instruction accessed them. But some operations do not need that information, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
+			
+			
+			Each of the operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection as a representative example. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the boolean logical operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the \texttt{\&} operator. Set intersection is implemented in the bit-set described above by treating the outer set as a sparse set, and the bit array as a dense set. See Algorithm \ref{bitsetintersect} for details. % going though each element of the source set, deleteing it is not in the destination set
+			
+			\begin{algorithm}
+				\caption{BitSetIntersect}
+				\label{bitsetintersect}
+				\begin{algorithmic}[1]
+					\Function{BitSetIntersection}{Dest,Src}
+					
+					\For{$\text{block},\text{bit-arr} \in \text{Dest}$}
+					
+					\If {$\text{blocknum} \in \text{Src}$}
+					\State { Src.remove(blocknum)}
+					\Else
+					\State { bit-arr \texttt{\&=} Dest.get(blocknum)}
+					\EndIf
+					\EndFor
+					
+					\EndFunction
+				\end{algorithmic}
+			\end{algorithm}
 		
 		\subsection{Checking conflicts}
 			
-			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory. To improve performance, FindConflictingInstructions is only run when IsParallel reports some conflict, as if there is no conflict then there couldn't be conflicts. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures.
+			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures.
 			
 			\begin{figure}
 				\caption{Conflict-Check outline}
@@ -1185,7 +1189,7 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsubsection{Truncation of FindConflictingInstructions}
 
-			To ensure efficiency, whether the loop is has conflicts or not, FindConflictingInstructions cannot be run too many times. We reduce the number of times it runs to a constant number per loop instance by making the following observations; 
+			Whether the loop is has conflicts or not, FindConflictingInstructions cannot be run for every iteration, or else the algorithm would run in quadratic time with the number of loop iterations, which is untenable. We reduce the number of times it runs to a constant number per loop instance, and to  by making the following observations; 
 			
 			If the loop iteration does not have any conflicts (discovered by running IsParallel), then we know that no instructions have conflicts, and we have no reason to run FindConflictingInstructions. 
 			
@@ -1274,46 +1278,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 %			AddressSets are first killed with set subtraction, and then unioned into the appropriate set. 
 %			Stride and Point tables are merged by simply extracting every Point or Stride from the source table, and adding them one at a time into the destination table using the add method . 
 %			
-		\subsection{AddressSet implementation}\label{s:access-set}
-			
-			The AddressSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
-			
-			%In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
-			
-			Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this integer set efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
-			
-			\begin{figure}[H]
-				\caption{AddressSet data structure}
-				\label{fig:bitset}
-				\includegraphics[scale=0.8]{bit_data.pdf}
-			\end{figure}
-			
-			%The Bit table stores a set of overall memory accesses, independently of the instruction it was accessed.
-			
-			%Points and strides store which instruction accessed them. But some operations do not need that information, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
-			
 		
-			Each of the operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection as a representative example. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the boolean logical operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the \texttt{\&} operator. Set intersection is implemented in the bit-set described above by treating the outer set as a sparse set, and the bit array as a dense set. See Algorithm \ref{bitsetintersect} for details. % going though each element of the source set, deleteing it is not in the destination set
-			
-			\begin{algorithm}
-				\caption{BitSetIntersect}
-				\label{bitsetintersect}
-				\begin{algorithmic}[1]
-					\Function{BitSetIntersection}{Dest,Src}
-					
-					\For{$\text{block},\text{bit-arr} \in \text{Dest}$}
-					
-					\If {$\text{blocknum} \in \text{Src}$}
-					\State { Src.remove(blocknum)}
-					\Else
-					\State { bit-arr \texttt{\&=} Dest.get(blocknum)}
-					\EndIf
-					\EndFor
-					
-					\EndFunction
-				\end{algorithmic}
-			\end{algorithm}
-			
 			
 			%The Bit table stores overall memory accesses, independently of the instruction it was accessed.
 			%This is in contrast to Point and Stride tables, which do store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information for performance reasons. In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
