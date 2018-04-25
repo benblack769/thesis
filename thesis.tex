@@ -279,14 +279,13 @@
 		This thesis makes several contributions:
 		
 		\begin{enumerate}
-			\item Built a tool to detect parallelism in loops. 
+			\item Built a memory efficient tool to detect parallelism in loops. 
 			\item Built a tool to collect a variety of metrics for our workload characterization. %, and match these metrics with the parallelism.
 			\item Analyze the possible effectiveness of these tools to distinguish between GPU and CPU oriented applications.
 		\end{enumerate}
 	
-	`	We hope these will make progress towards the eventual goal.
-	
-		WHY ARE THESE PARTS IMPORTANT!!!!!!!!!!!!
+		Chapter 1 introduces parallelism detection and apporaches to improve memory efficiency. Chapter 2 describes implementation details of the tools, and Chapter 3 presents some results on how well these tools ended up working. 
+	`	%We hope these will make progress towards the eventual goal.
 	
 		
 \chapter{Dynamic parallelism detection}
@@ -817,9 +816,11 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		\subsection{Implementation of a bit compressed integer set}
 		
-		A locally dense set implementation should use the advantages of dense and sparse set implementations. 
-		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set should be implemented by a hash table where each entry is a bit array that represents a contiguous range of integers starting at a particular location. Figure \ref{fig:bit-local-density} shows the the three different types of sets storing the set $\{0, 3, 10\}$.
 		
+		A locally dense set implementation should use the advantages of dense and sparse set implementations. 
+		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set should be implemented by a hash table where each entry is a bit array that represents a contiguous range of integers starting at a particular location. Figure \ref{fig:bit-local-density} shows the the three different types of sets storing the set $\{0, 3, 10\}$. 
+		
+		The items in the hash table in the locally dense set are key value pairs. The key in a key value pair is a unique identifier to a location in the table. The value is other information 
 		
 		\begin{figure}[H]
 			\caption{Representations of the set $\{0, 3, 10\}$}
@@ -965,13 +966,13 @@ for(int i = 1; i < 12; i = i + 3){
 %		hpc/salishan/salishan2005/davidpatterson.pdf.
 %		\footnote{\cite{Che:2010}}
 		
-		For each algorithm, Rodinia has a CPU implementation threaded using OpenMP. Since our tool does not support multithreaded applications, we removed the OpenMP compilation flag, and removed calls to the OpenMP library such as \texttt{omp\_get\_thread\_num()} from the source code. 
+		For each algorithm, Rodinia has a CPU implementation which is multi-threaded using OpenMP. Since our tool does not support multithreaded applications, we removed the OpenMP compilation flag, and removed calls to the OpenMP library such as \texttt{omp\_get\_thread\_num()} from the source code. 
 		
 		\subsubsection{Parsec}
 		
-		Parsec is a benchmark for multi-threaded applications on CPUs.\footnote{\cite{Bienia:2008}} It has a more diverse range of applications than Rodinia, including computer vision and textual analysis as well as traditional scientific computing applications.
+		Parsec is a benchmark of multi-threaded applications on designed for multiprocessors.\footnote{\cite{Bienia:2008}} It has a more diverse range of applications than Rodinia, including computer vision and textual analysis as well as traditional scientific computing applications.
 		
-		Parsec was more difficult to get running on our system. There were some applications which were incompatible with C++11, and did not compile, and many others which could not be altered to run single threaded without substantially changing the structure of the code, and so they could not be run on our analysis tools.  
+		Parsec was more difficult to get running on our system. There were some applications which were incompatible with C++11, and did not compile, and many others which could not be altered to run single threaded without substantially changing the structure of the code, and so they could not be run on our analysis tools. We present results only for the applications that we could successfully compile and run on our tools. 
 		
 
 	
@@ -1294,35 +1295,63 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			\subsection{Main ideas}
 			
-			Similarly to the naive method, accesses are grouped by their memory address, and instruction information is linked to. But instead of individual memory locations having this information, whole blocks of memory do. %have instructions linked to.
+			The main idea is to combine the naive method's approach of listing instructions for each memory address, and bit compressions approach of breaking up the address space into contiguous blocks of bit arrays. 
+			Exactly how these ideas are combined is explained with diagrams.
+			%Similarly to the naive method, accesses are grouped by their memory address, and instruction information is linked to. 
 			
-			Similar to the bit compressed set described in Section \ref{s:access-set}, the table splits the address space into fixed width blocks, and stores the accesses in that block if there are any (second row of Figure \ref{fig:bit-idea}). Unlike that set, for each block, it also stores a map of instructions to the data which that specific instruction stored (third row of Figure \ref{fig:bit-idea}). Call of the block information together a BlockInfo. Call a fixed length bit array a BlockSet. 
+			Figure \ref{fig:naive-table} shows how the naive implementation stores the accesses listed in Table \ref{t:examp-acc}. The accessed memory addresses all store a list of instructions which accessed that address. So memory address 3 stores the list that just contains instruction 15. 
+			
+			\begin{table}[H]
+				\caption{Example accesses}
+				\label{t:examp-acc}
+				\begin{tabular}{ |c|c| }
+					\hline
+					Instruction & MemAddress \\ \hline
+					21 & 0 \\ \hline
+					15 & 0 \\ \hline
+					15 & 3 \\ \hline
+					3 & 10 \\ \hline
+				\end{tabular}
+			\end{table}
+			
+			
+			
+			Figure \ref{fig:bit-comp-idea} shows how the bit compression implementation stores this same set of accesses. 
+			Similarly to  the bit compressed set described in Section \ref{s:access-set},\footnote{Note that the exact memory addresses accessed are identical to the example in Figure \ref{fig:bit-local-density}, so that figure can be used for additional context into this implementation.} the table splits the address space into fixed width blocks. Each block stores two things. Most importantly, it stores a map of instructions to the addresses in the block which that instruction accessed (second row of the BlockInfo). For performance reasons, it also stores a bit array of overall accesses (first row of the BlockInfo). 
+			
+			
 			
 			\begin{figure}[h]
-				\caption{Overall idea}
-				\label{fig:bit-idea}
-				\includegraphics[scale=0.85]{BlockSet_accesses.pdf}
+				\caption{Naive implementation table}
+				\label{fig:naive-table}
+				\includegraphics[scale=0.85]{BlockSetnaive_structure.pdf}
 			\end{figure}
-			
-			\subsection{Data structures}
-			
-			Similarly to the stride compression implementation, pending and history table is divided into two tables, one for reads and one for writes. %This table is organized by memory address block, meaning each key is a memory address
-			
-			%If a particular block of memory is never accessesed, then nothing representing that block is never put in the set. 
-			
-			All information about that block of memory is stored in a BlockInfo object, which is shown in Figure \ref{fig:block-data}. BlockInfo stores two thing: a set of overall memory accesses in the block, and a map of instruction addresses to the accesses performed by that instruction in that block. Only instructions which access something in the block are stored.
-
-%			\begin{figure}[h]
-%				\caption{CompressedTable}
-%				\label{fig:bit-data}
-%				\includegraphics[scale=1.0]{bit-data-structure.pdf}
-%			\end{figure}
 		
 			\begin{figure}[h]
-				\caption{BlockInfo}
-				\label{fig:block-data}
-				\includegraphics[scale=1.0]{block-info.pdf}
+				\caption{Bit compressed table}
+				\label{fig:bit-comp-idea}
+				\includegraphics[scale=0.85]{BlockSet_accesses.pdf}
 			\end{figure}
+%			
+%			\subsection{Data structures}
+%			
+%			Similarly to the stride compression implementation, pending and history table is divided into two tables, one for reads and one for writes. %This table is organized by memory address block, meaning each key is a memory address
+%			
+%			%If a particular block of memory is never accessesed, then nothing representing that block is never put in the set. 
+%			
+%			All information about that block of memory is stored in a BlockInfo object, which is shown in Figure \ref{fig:block-data}. BlockInfo stores two thing: a set of overall memory accesses in the block, and a map of instruction addresses to the accesses performed by that instruction in that block. Only instructions which access something in the block are stored.
+%
+%%			\begin{figure}[h]
+%%				\caption{CompressedTable}
+%%				\label{fig:bit-data}
+%%				\includegraphics[scale=1.0]{bit-data-structure.pdf}
+%%			\end{figure}
+%		
+%			\begin{figure}[h]
+%				\caption{BlockInfo}
+%				\label{fig:block-data}
+%				\includegraphics[scale=1.0]{block-info.pdf}
+%			\end{figure}
 %						
 %			
 %			\begin{figure}[h]
@@ -1733,10 +1762,7 @@ for(int i=h_graph_nodes[tid].starting;
 	\setcounter{chapter}{4}
 	\setcounter{section}{0}
 
-Here's a conclusion, demonstrating the use of all that manual incrementing and table of contents adding that has to happen if you use the starred form of the chapter command. The deal is, the chapter command in \LaTeX\ does a lot of things: it increments the chapter counter, it resets the section counter to zero, it puts the name of the chapter into the table of contents and the running headers, and probably some other stuff.
-
-So, if you remove all that stuff because you don't like it to say ``Chapter 4: Conclusion'', then you have to manually add all the things \LaTeX\ would normally do for you. Maybe someday we'll write a new chapter macro that doesn't add ``Chapter X'' to the beginning of every chapter title.
-
+	
 
 %If you feel it necessary to include an appendix, it goes here.
     \appendix
