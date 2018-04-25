@@ -815,7 +815,7 @@ for(int i = 1; i < 12; i = i + 3){
 		Stride compression is effective because many memory intensive procedures in real applications access memory in a strided fashion. Bit compression is effective because program memory is locally dense, meaning if memory is accessed in one location, nearby memory addresses are usually also valid program memory which will be accessed eventually. This local density property is virtually guaranteed by modern operating systems and hardware, and so it is not as dependent on the program's structure as stride compression. 
 		
 		\subsection{Implementation of a bit compressed integer set}
-		
+		\label{s:bit-set-comp-impl}
 		
 		A locally dense set implementation should use the advantages of dense and sparse set implementations. 
 		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set should be implemented by a hash table where each entry is a bit array that represents a contiguous range of integers starting at a particular location. Figure \ref{fig:bit-local-density} shows the the three different types of sets storing the set $\{0, 3, 10\}$. 
@@ -1127,14 +1127,18 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			%These criterion guarantee that any adjoining strides are mergable. The inner binary search tree is used to check if the strides do in fact adjoin. This is difficult because unlike an interval tree, only the start of the stride is ordered in the binary search tree.
 			
-		\subsection{AddressSet implementation}\label{s:access-set}
+		\subsection{Adding addresses to the AddressSet}\label{s:access-set}
 			
 			%The AddressSet stores a set of memory addresses. This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. It is critical in reducing the number of inefficient Find-Overlapping operations that are needed. It is also helpful for quickly checking killed memory locations. 
 			
 			%In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
 			
-			The AddressSet
-			Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this integer set efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
+			%Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this integer set efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
+			
+			The AddressSet is implemented as a bit compressed set as described in Section \ref{s:bit-set-comp-impl}. That is, it is a table where each entry is a key value pair where the key is the address/BlockSize, and the value is a bit array of length BlockSize.
+			
+			The bit array is implemented with a C++ \texttt{bitset} which has easy and fast intersection and union operations. 
+			
 			
 			\begin{figure}[H]
 				\caption{AddressSet data structure}
@@ -1146,21 +1150,18 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			%Points and strides store which instruction accessed them. But some operations do not need that information, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
 			
-			
-			Each of the operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection as a representative example. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the boolean logical operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the \texttt{\&} operator. Set intersection is implemented in the bit-set described above by treating the outer set as a sparse set, and the bit array as a dense set. See Algorithm \ref{bitsetintersect} for details. % going though each element of the source set, deleteing it is not in the destination set
+			%Each of the operations are a combination of the obvious implementation for sparse sets, and the implementation for dense sets. Take in-place set intersection as a representative example. In a sparse set, in-place set intersection can be implemented by iterating through each element of the destination set, and deleting it if the element is not in the source set. In dense sets, the intersection is simply the boolean logical operation $x = x \land y$, applied to every bit. This can be implemented easily and quickly in C with the \texttt{\&} operator. Set intersection is implemented in the bit-set described above by treating the outer set as a sparse set, and the bit array as a dense set. See Algorithm \ref{bitsetintersect} for details. % going though each element of the source set, deleteing it is not in the destination set
 			
 			\begin{algorithm}
 				\caption{BitSetIntersect}
 				\label{bitsetintersect}
 				\begin{algorithmic}[1]
 					\Function{BitSetIntersection}{Dest,Src}
-					
-					\For{$\text{block},\text{bit-arr} \in \text{Dest}$}
-					
+					\For{$\text{block},\text{bitset} \in \text{Dest}$}
 					\If {$\text{blocknum} \in \text{Src}$}
 					\State { Src.remove(blocknum)}
 					\Else
-					\State { bit-arr \texttt{\&=} Dest.get(blocknum)}
+					\State { bitset \texttt{\&=} Dest.get(blocknum)}
 					\EndIf
 					\EndFor
 					
@@ -1317,9 +1318,9 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			
 			Figure \ref{fig:bit-comp-idea} shows how the bit compression implementation stores this same set of accesses. 
-			Similarly to  the bit compressed set described in Section \ref{s:access-set},\footnote{Note that the exact memory addresses accessed are identical to the example in Figure \ref{fig:bit-local-density}, so that figure can be used for additional context into this implementation.} the table splits the address space into fixed width blocks. Each block stores two things. Most importantly, it stores a map of instructions to the addresses in the block which that instruction accessed (second row of the BlockInfo). For performance reasons, it also stores a bitset of overall accesses (first row of the BlockInfo). 
+			Similarly to  the bit compressed set described in Section \ref{s:access-set},\footnote{Note that the exact memory addresses accessed are identical to the example in Figure \ref{fig:bit-local-density}, so that figure can be used for additional context into this implementation.} the table splits the address space into fixed width blocks. Each block stores two things. Most importantly, it stores a map of instructions to the addresses in the block which that instruction accessed (second row of the BlockInfo). In order to speed up conflict-check, it also stores a bitset of overall accesses (first row of the BlockInfo). 
 			
-			
+			This main data structure is used in the pending and history tables. Again, there are two of these data structures in each pending and history table, one for reads and one for writes. 
 			
 			\begin{figure}[h]
 				\caption{Naive implementation table}
@@ -1343,16 +1344,17 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			\subsection{Adding new memory}
 			
-			Adding new memory is strait-forward
 			When a byte of memory is accessed by an instruction, then:
 			
 			\begin{enumerate}
-				\item If there is no BlockInfo that covers the address in the table, then add an empty one.
-				\item Add the bytes accessed to the overall accesses bitset in that BlockInfo.
+				\item If the 
+				\item If there is no BlockInfo that covers the address in the pending table, then add an empty one. 
+				\item Add the byte accessed to the overall accesses bitset in that BlockInfo.
 				\item If the instruction is not in the BlockInfo, add it.
-				\item Add the bytes accessed to the bitset associated with the instruction.
+				\item Add the byte accessed to the bitset associated with the instruction.
 			\end{enumerate}
 			
+			If multiple bytes are accessed by the same access, then this process is just repeated for each byte. 
 			
 			% the access is added to the BlockInfo, (the BlockInfo is put in the table if there is none there). 
 			%is put in the accessed block of memory is first accessed,
@@ -1364,7 +1366,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			Note that access can only conflict with accesses with the same memory address. So if a pending table has a BlockInfo specified by a certain MemAddress/BlockSize, and the history table does not, then none of the accesses in that BlockInfo in the pending table conflict with the history table. 
 			
 			So the non-trivial important case is when a BlockInfo is both in the pending and history table. 
-			In the worst case, this is done by comparing each pair of instructions in the respective BlockInfos, and checking if the intersection of their bitsets is empty. The overall accesses bitset is used to prune this computation, because if a bitset for an instruction does not conflict with the overall bitset in the other BlockInfo, then it also does not conflict with any of the instructions.  %, giving the resulting algorithm.
+			In the worst case, this is done by comparing each pair of instructions in the respective BlockInfos, and checking if the intersection of their respective bitsets is empty. The overall access bitset is used to prune this computation, because if a bitset for an instruction does not conflict with the overall bitset in the other BlockInfo, then it also does not conflict with any of the instructions. %, giving the resulting algorithm.
 			
 %			\begin{enumerate}
 %				\item Find the blocks in the read table of the pending table which overlap with blocks from the write table of the history table. 
@@ -1374,11 +1376,15 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			\subsection{Merge}
 			
-			Merging tables is as simple as merging the sets of instructions, and computing the union of the bitsets associated with a particular instruction in a BlockInfo. 
+			Merging tables is as simple as merging the sets of instructions in the matching BlockInfos, and computing the union of the bitsets associated with a particular instruction in a BlockInfo. The union of the overall access bitset is also calculated. 
 			
-			\subsection{Killing history tables}
+			\subsection{Killing accesses}
 			
+			Recall that the accesses which are written but not read in the pending table are killed, and no further access should be added.
 			
+			So when adding new accesses, new accessed bytes are intersected
+			
+			When merging the history table into the pending table, 
 			
 \chapter{Results}
 	
