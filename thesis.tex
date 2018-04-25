@@ -147,9 +147,6 @@
     \chapter*{Abstract}
 	The preface pretty much says it all.
 
-	\chapter*{Dedication}
-	You can have a dedication here if you wish.
-
   \mainmatter % here the regular arabic numbering starts
   \pagestyle{fancyplain} % turns page numbering back on
 
@@ -1344,10 +1341,10 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			\subsection{Adding new memory}
 			
-			When a byte of memory is accessed by an instruction, then:
+			When a byte of memory is accessed by an instruction, then
 			
 			\begin{enumerate}
-				\item If the 
+				\item If the byte is killed (in the overall accesses set of the write table, but not the read table), then do nothing, and exit.  
 				\item If there is no BlockInfo that covers the address in the pending table, then add an empty one. 
 				\item Add the byte accessed to the overall accesses bitset in that BlockInfo.
 				\item If the instruction is not in the BlockInfo, add it.
@@ -1382,9 +1379,9 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			Recall that the accesses which are written but not read in the pending table are killed, and no further access should be added.
 			
-			So when adding new accesses, new accessed bytes are intersected
+			%So when adding new accesses, new accessed bytes are intersected
 			
-			When merging the history table into the pending table, 
+			So when merging the history table into the pending table, the bitset in the pending table which is the intersection of the write bitset and the negation of the read bitset is computed, and all instruction and overall bitsets in the BlockInfo at that location in the pending table are computed. 
 			
 \chapter{Results}
 	
