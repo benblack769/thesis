@@ -1295,8 +1295,8 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			\subsection{Main ideas}
 			
-			The main idea is to combine the naive method's approach of listing instructions for each memory address, and bit compressions approach of breaking up the address space into contiguous blocks of bit arrays. 
-			Exactly how these ideas are combined is explained with diagrams.
+			The main idea is to combine the naive method's approach of listing instructions for each memory address, and bit compressions approach of breaking up the address space into contiguous blocks which are stored as bit arrays. 
+			The interactions of these ideas are explained with diagrams.
 			%Similarly to the naive method, accesses are grouped by their memory address, and instruction information is linked to. 
 			
 			Figure \ref{fig:naive-table} shows how the naive implementation stores the accesses listed in Table \ref{t:examp-acc}. The accessed memory addresses all store a list of instructions which accessed that address. So memory address 3 stores the list that just contains instruction 15. 
@@ -1317,7 +1317,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			
 			Figure \ref{fig:bit-comp-idea} shows how the bit compression implementation stores this same set of accesses. 
-			Similarly to  the bit compressed set described in Section \ref{s:access-set},\footnote{Note that the exact memory addresses accessed are identical to the example in Figure \ref{fig:bit-local-density}, so that figure can be used for additional context into this implementation.} the table splits the address space into fixed width blocks. Each block stores two things. Most importantly, it stores a map of instructions to the addresses in the block which that instruction accessed (second row of the BlockInfo). For performance reasons, it also stores a bit array of overall accesses (first row of the BlockInfo). 
+			Similarly to  the bit compressed set described in Section \ref{s:access-set},\footnote{Note that the exact memory addresses accessed are identical to the example in Figure \ref{fig:bit-local-density}, so that figure can be used for additional context into this implementation.} the table splits the address space into fixed width blocks. Each block stores two things. Most importantly, it stores a map of instructions to the addresses in the block which that instruction accessed (second row of the BlockInfo). For performance reasons, it also stores a bitset of overall accesses (first row of the BlockInfo). 
 			
 			
 			
@@ -1332,33 +1332,14 @@ find_overlapping_intervals(A : interval list, B : interval list)
 				\label{fig:bit-comp-idea}
 				\includegraphics[scale=0.85]{BlockSet_accesses.pdf}
 			\end{figure}
-%			
-%			\subsection{Data structures}
-%			
-%			Similarly to the stride compression implementation, pending and history table is divided into two tables, one for reads and one for writes. %This table is organized by memory address block, meaning each key is a memory address
-%			
-%			%If a particular block of memory is never accessesed, then nothing representing that block is never put in the set. 
-%			
-%			All information about that block of memory is stored in a BlockInfo object, which is shown in Figure \ref{fig:block-data}. BlockInfo stores two thing: a set of overall memory accesses in the block, and a map of instruction addresses to the accesses performed by that instruction in that block. Only instructions which access something in the block are stored.
-%
-%%			\begin{figure}[h]
-%%				\caption{CompressedTable}
-%%				\label{fig:bit-data}
-%%				\includegraphics[scale=1.0]{bit-data-structure.pdf}
-%%			\end{figure}
-%		
-%			\begin{figure}[h]
-%				\caption{BlockInfo}
-%				\label{fig:block-data}
-%				\includegraphics[scale=1.0]{block-info.pdf}
-%			\end{figure}
-%						
-%			
-%			\begin{figure}[h]
-%				\caption{BlockInfo}
-%				\label{fig:block-info-data}
-%				\includegraphics[scale=0.8]{bitCompresslabeled.pdf}
-%			\end{figure}
+		
+			\subsubsection{Implementation details of data structures}
+			
+			All key value sets are implemented with the C++ standard library \texttt{map}. Under the covers, this is implemented a binary search tree, but we only use functionality that hash tables also have. 
+			
+			To implement the bit array, we use the C++ standard library \texttt{bitset}, which allows for easy bit access and assignment, and also union and intersection operations. Under the covers, this is just an array of integers. The C++ \texttt{bitset}'s union, intersection, and set subtraction operations are extremely fast, because they are implemented with C++'s logical bitwise operations \texttt{|}, \texttt{\&}, and \texttt{\~}. These operations process all the bits in a single integer in parallel. 
+			
+			The address space is divided into blocks of 256 bytes, resulting in a 256 length bitset, which takes up 32 bytes of memory. This number was chosen because in the best case this allows for over 100 times the efficiency of the naive method, and in the worst case. it is only around 5 times worse than the naive method, since it only stores one blockset per instruction, and an instruction takes 8 bytes to store. 
 			
 			\subsection{Adding new memory}
 			
@@ -1367,10 +1348,11 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			\begin{enumerate}
 				\item If there is no BlockInfo that covers the address in the table, then add an empty one.
-				\item Add the byte to the union part of the BlockInfo.
+				\item Add the bytes accessed to the overall accesses bitset in that BlockInfo.
 				\item If the instruction is not in the BlockInfo, add it.
-				\item Add the byte to the BlockSet associated with the instruction.
+				\item Add the bytes accessed to the bitset associated with the instruction.
 			\end{enumerate}
+			
 			
 			% the access is added to the BlockInfo, (the BlockInfo is put in the table if there is none there). 
 			%is put in the accessed block of memory is first accessed,
@@ -1379,16 +1361,23 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			When the pending table is merged into the history table, pairs of conflicting instructions need to be found. 
 			
-			\begin{enumerate}
-				\item Find the blocks in the read table of the pending table which overlap with blocks from the write table of the history table. 
-				\item If the intersection of the "union" property of the BlockInfo is empty, then the blocks do not conflict.
-				\item Otherwise, check each pair of instruction BlockSets in the BlockInfo to see which instructions do conflict. 
-			\end{enumerate}
+			Note that access can only conflict with accesses with the same memory address. So if a pending table has a BlockInfo specified by a certain MemAddress/BlockSize, and the history table does not, then none of the accesses in that BlockInfo in the pending table conflict with the history table. 
 			
+			So the non-trivial important case is when a BlockInfo is both in the pending and history table. 
+			In the worst case, this is done by comparing each pair of instructions in the respective BlockInfos, and checking if the intersection of their bitsets is empty. The overall accesses bitset is used to prune this computation, because if a bitset for an instruction does not conflict with the overall bitset in the other BlockInfo, then it also does not conflict with any of the instructions.  %, giving the resulting algorithm.
+			
+%			\begin{enumerate}
+%				\item Find the blocks in the read table of the pending table which overlap with blocks from the write table of the history table. 
+%				\item If the intersection of the "union" property of the BlockInfo is empty, then the blocks do not conflict.
+%				\item Otherwise, check each pair of instruction BlockSets in the BlockInfo to see which instructions do conflict. 
+%			\end{enumerate}
 			
 			\subsection{Merge}
 			
-			Merging tables is as simple as merging the sets of instructions, and the BlockSets associated with them. 
+			Merging tables is as simple as merging the sets of instructions, and computing the union of the bitsets associated with a particular instruction in a BlockInfo. 
+			
+			\subsection{Killing history tables}
+			
 			
 			
 \chapter{Results}
