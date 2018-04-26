@@ -896,13 +896,16 @@ for(int i = 1; i < 12; i = i + 3){
 		To capture this, we measure the amount of memory shared between loop iterations vs reaccessed within a single iteration.
 		We construct maps of the memory footprint of the loop and each of its iterations. From these memory footprints, we calculate the number of unique memory bytes accessed in each iteration as well whole loop instance. %From that, the number of shared bytes between threads 
 		
-	\section{Metrics}
+	\subsection{Loop level Metrics}
 		
 		An important contribution of this thesis is creating tools which allow parallelizability information to be combined with other metrics in our workload characterization. 
 		In particular, since we evaluate loop level parallelizability, we chose to collect all other metrics at the loop level. 
 		
-		We chose metrics based on the main differences between CPUs and GPUs. 
+		We chose some metrics based on the main differences between CPUs and GPUs as described previously in this section, as well as some other metrics which are common in workload characterization. Table \ref{table:sum-data} summarizes these metrics. 
 		
+		\begin{table}[h]
+			\caption{Summary of collected data}
+			\label{table:sum-data}
 		\begin{tabular}{ |p{6cm}|p{7cm}| }
 			\hline
 			Metric & Relevant hardware characteristic(s) \\
@@ -911,19 +914,20 @@ for(int i = 1; i < 12; i = i + 3){
 			\hline
 			Instruction count of loop iterations  & Scale of Parallelism \\
 			\hline
-			Number of writes/reads & ??? \\
+			Number of writes/reads & Traditional workload characterization \\
 			\hline
-			Bytes accessed per instance & Memory??? \\
+			Bytes accessed per instance & Traditional workload characterization \\
 			\hline
-			Total memory footprint of loop & Memory???  \\
+			Total memory footprint of loop & Memory sharing  \\
 			\hline
-			Shared memory footprint between loop iterations & Memory??? \\
+			Shared memory footprint between loop iterations & Memory sharing \\
 			\hline
-			Strided accesses  & Latency vs. bandwidth \\
+			Strided accesses  & Memory access predictability \\
 			\hline
-			Number of branch changes & Warp divergence and branch prediction \\
+			Number of branch changes & Parallelism type\\
 			\hline
 		\end{tabular}
+		\end{table}
 	
 
 
@@ -995,13 +999,13 @@ for(int i = 1; i < 12; i = i + 3){
 					\item Check for conflicts between accesses in pending and history tables CONFLICT-CHECK
 					\item Merge pending table into history table MERGE
 				\end{enumerate}
-				\item After an entire loop ends, merge pending table into history table 
+				\item After an entire loop ends
 				\begin{enumerate}
-					\item A
+					\item Merge all not killed accesses in the history table into the pending table 
 				\end{enumerate}
 			\end{enumerate}
 			
-			There are three main data structures inside a pending or history table. The purpose of these data structures is outlined here, and the details will be explained later. 
+			Our stride compression implementation has three main data structures inside a pending or history table. The purpose of these data structures is outlined here, and the details will be explained later. 
 			
 			\begin{itemize}
 				\item StrideTable: This table stores strided accesses and their instructions. Strides can be added efficiently to this table.
@@ -1011,18 +1015,18 @@ for(int i = 1; i < 12; i = i + 3){
 			\end{itemize}
 		
 			
-			%These data structures store the content of the pending and history tables, but reads and writes are stored separately. See Figure \ref{fig:loopinstance} for how these tables fit inside the LoopInstance. 
+			These data structures store the content of the pending and history tables, but reads and writes are stored separately. See Figure \ref{fig:loopinstance} for how these tables fit inside the LoopInstance. 
 			
-%			\begin{figure}[H]
-%				\caption{LoopInstance Layout}
-%				\label{fig:loopinstance}
-%				\includegraphics[scale=0.7]{loop-instance.pdf}
-%			\end{figure}
+			\begin{figure}[H]
+				\caption{LoopInstance Layout}
+				\label{fig:loopinstance}
+				\includegraphics[scale=0.7]{loop-instance.pdf}
+			\end{figure}
 			
 			
 		\subsection{Adding accesses}\label{s:add-accesses}
 		
-		Algorithm \ref{new-memory-acc} describes the high level description of how new memory accesses are put in the pending table. % a lot of details out. These details will be explained here. 
+		Algorithm \ref{new-memory-acc} describes the high level description of how new memory accesses are put in the pending table. Figure \ref{fig:add-access} shows the steps in a more readable format. The numbers in the figure correspond to the steps in the algorithm.% a lot of details out. These details will be explained here. 
 		
 		\begin{algorithm}
 			\caption{New memory accesses}\label{new-memory-acc}
@@ -1041,13 +1045,13 @@ for(int i = 1; i < 12; i = i + 3){
 		\begin{figure}
 			\caption{Adding accesses}
 			\label{fig:add-access}
-			\includegraphics[scale=0.6]{add_access.pdf}
+			\includegraphics[scale=0.7]{add_access.pdf}
 		\end{figure}
 		
 		
 		\subsubsection{Stride Detection}
 		
-		The StrideDetector is implemented to match the original SD$^3$ design  (described in section \ref{sse:stride-descr}) as closely as possible. The state machine matches Figure \ref{fig:stride-detector}.
+		The StrideDetector is implemented to match the original SD$^3$ design described in section \ref{sse:stride-descr} as closely as possible. The state machine matches Figure \ref{fig:stride-detector}.
 		
 		\subsubsection{Adding points to the PointTable}
 		
@@ -1057,7 +1061,7 @@ for(int i = 1; i < 12; i = i + 3){
 			%Recall that Points are specified by instruction address, memory address, and access mode (read or write). 
 			%In Figure \ref{fig:point-table}, you can see that the a Point is stored for each instruction and memory address. 
 			
-			\begin{figure}
+			\begin{figure}[h]
 				\caption{Point Table}
 				\label{fig:point-table}
 				\includegraphics[scale=0.8]{point_data.pdf}
@@ -1076,7 +1080,7 @@ for(int i = 1; i < 12; i = i + 3){
 			When possible, strides need to be merged into existing strides in the table. This is critical for compression (see section \ref{sse:stride-descr}.5). The StrideTable is designed to make this process simple and efficient. 
 			At a high level, the StrideTable is a set of ordered sets of strides (see Figure \ref{fig:stride-table}). %The outer set ensures that a particular inner set contains only strides which are mergeable if they adjoin. The inner ordered set is used to check if the strides do adjoin, in which case, they are mergeable.
 			
-			\begin{figure}
+			\begin{figure}[h]
 				\caption{Stride Table}
 				\label{fig:stride-table}
 				\includegraphics[scale=0.8]{stride_data.pdf}
@@ -1132,9 +1136,7 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			%Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this integer set efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
 			
-			The AddressSet is implemented as a bit compressed set as described in Section \ref{s:bit-set-comp-impl}. That is, it is a table where each entry is a key value pair where the key is the address/BlockSize, and the value is a bit array of length BlockSize.
-			
-			The bit array is implemented with a C++ \texttt{bitset} which has easy and fast intersection and union operations. 
+			The AddressSet is implemented as a bit compressed set as described in Section \ref{s:bit-set-comp-impl}. That is, it is a table where each entry is a key value pair where the key is an integer which is equal to the $\lfloor \text{address}/\text{BlockSize} \rfloor$, and the value is a bit array of length BlockSize. Figure \ref{fig:bitset} shows a summary of the data structure. 
 			
 			
 			\begin{figure}[H]
@@ -1142,7 +1144,23 @@ for(int i = 1; i < 12; i = i + 3){
 				\label{fig:bitset}
 				\includegraphics[scale=1.0]{bit_data.pdf}
 			\end{figure}
-				
+		
+			The table is implemented with a C++ \texttt{map}.
+			The bit array is implemented with a C++ standard libary's \texttt{bitset} which has easy and fast intersection and union operations which are based on the C++ bitwise logical operators \texttt{\&} and \texttt{|}. Bit access and assignment are also made easy, treated syntactically similar to array access, but are implemented as a mix of array access and bit twiddling. %, and are generally a little slower than accessing ordinary arrays. %, but are still fast enough to 
+			
+			This allows new addresses to be added to the set with a single line of C++:
+			%
+\begin{verbatim}
+bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
+\end{verbatim}
+			%
+			This line depends on a quirk of C++ \texttt{map}: new entries are automatically created when accessed for the first time. 
+			
+			The AddressSet has other operations that are implemented. For example, during conflict checking, the intersection of the set is taken, and during merging, the union of the set is taken. 
+			These operations follow a certain pattern. Take in-place set intersection (shown in Algorithm \ref{bitsetintersect}) as a representative example. The algorithm goes through one of the sets item by item (in this case, the destination set). If the item is not in the other set, then it is treated as if it were a sparse set. In this case, the element is simply removed. If the item is in both sets, then it uses the corresponding operation on the bitsets. In this case, C++'s the bitwise \texttt{\&} operator corresponds exactly to set intersection. This results in an efficient set intersection implementation. 
+			
+			%So when a address is added to this set, it finds the block it is in by doing floor division by the BlockSize, and then setting the value of the address \% BlockSize bitset 
+			
 			%The Bit table stores a set of overall memory accesses, independently of the instruction it was accessed.
 			
 			%Points and strides store which instruction accessed them. But some operations do not need that information, they only need the overall memory accesses in the scope, independently of the instruction. We found it advantageous to store this information as well. It is implemented as a compressed bit set, described loosely in section 1.6. Here is a more precise description of the set's data structure:
@@ -1156,9 +1174,9 @@ for(int i = 1; i < 12; i = i + 3){
 					\Function{BitSetIntersection}{Dest,Src}
 					\For{$\text{block},\text{bitset} \in \text{Dest}$}
 					\If {$\text{blocknum} \in \text{Src}$}
-					\State { Src.remove(blocknum)}
-					\Else
 					\State { bitset \texttt{\&=} Dest.get(blocknum)}
+					\Else
+					\State { Src.remove(blocknum)}
 					\EndIf
 					\EndFor
 					
@@ -1173,21 +1191,8 @@ for(int i = 1; i < 12; i = i + 3){
 			\begin{figure}
 				\caption{Conflict-Check outline}
 				\label{fig:conflict-check}
-				\includegraphics[scale=1.0]{conflict-diagram.pdf}
+				\includegraphics[scale=1.0]{conflict-diagram-output.pdf}
 			\end{figure}
-		
-		
-		\subsubsection{Truncation of FindConflictingInstructions}
-
-			Whether the loop is has conflicts or not, FindConflictingInstructions cannot be run for every iteration, or else the algorithm would run in quadratic time with the number of loop iterations, which is untenable. We reduce the number of times it runs to a constant number per loop instance, and to  by making the following observations; 
-			
-			If the loop iteration does not have any conflicts (discovered by running IsParallel), then we know that no instructions have conflicts, and we have no reason to run FindConflictingInstructions. 
-			
-			If the loop does have conflicts, then the same conflicts most likely occur in many other loop iterations. So after we have found the locations of conflicts in some constant number of loop iterations, we simply do not check later iterations. The information reported may be incomplete, but some conflicts will always be reported.% We accept the imperfection of reporting 
-				%The conflicting instructions are simply guides to the programmer. As such they do not have to be 100\% accurate. In particular, if there are some instruction conflicts which are reported, and others which are not, this is not a serious problem. So this information can be truncated.  
-			
-			Combined, these two truncation techniques mean that we have reasonably accurate reporting while only running FindConflictingInstructions a constant number of times for a particular loop instance.
-			%more than a constant number of times in a loop 
 		
 		\subsubsection{IsParallel}
 		
@@ -1256,7 +1261,22 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			 
 			%In particular, it is important to note that having constant time comparison is not needed for algorithmic efficiency of the method. After all, each element of the stride is added one at a time, and it is only compari
 			
-		\subsection{Loop termination}
+			
+		
+		\subsubsection{Truncation of FindConflictingInstructions}
+			
+			Whether the loop is has conflicts or not, FindConflictingInstructions cannot be run for every iteration, or else the algorithm would run in quadratic time with the number of loop iterations, which is untenable. We reduce the number of times it runs to a constant number per loop instance, and to  by making the following observations; 
+			
+			If the loop iteration does not have any conflicts (discovered by running IsParallel), then we know that no instructions have conflicts, and we have no reason to run FindConflictingInstructions. 
+			
+			If the loop does have conflicts, then the same conflicts most likely occur in many other loop iterations. So after we have found the locations of conflicts in some constant number of loop iterations, we simply do not check later iterations. The information reported may be incomplete, but some conflicts will always be reported.% We accept the imperfection of reporting 
+			%The conflicting instructions are simply guides to the programmer. As such they do not have to be 100\% accurate. In particular, if there are some instruction conflicts which are reported, and others which are not, this is not a serious problem. So this information can be truncated.  
+			
+			Combined, these two truncation techniques mean that we have reasonably accurate reporting while only running FindConflictingInstructions a constant number of times for a particular loop instance.
+			%more than a constant number of times in a loop 
+			
+			
+	\subsection{Loop termination}
 		
 			When a loop terminates, and it is not the outermost active loop, then it must be merged into its parent loop. Each Point and Stride is extracted from the outer loop's history table, and unless it is killed, it is added to the inner loop's pending table using the add method described in Section \ref{s:add-accesses}. 
 		
