@@ -77,12 +77,12 @@
 
 
 
-\title{My Final College Paper}
-\author{Your R. Name}
+\title{Efficient Parallelism Detection for Heterogeneous Computing}
+\author{Benjamin Black}
 % The month and year that you submit your FINAL draft TO THE LIBRARY (May or December)
-\date{May 200x}
+\date{May 2017}
 \division{Mathematics and Natural Sciences}
-\advisor{Advisor F. Name}
+\advisor{Kelly Shaw}
 %If you have two advisors for some reason, you can use the following
 %\altadvisor{Your Other Advisor}
 %%% Remember to use the correct department!
@@ -108,33 +108,33 @@
 
 % Acknowledgements (Acceptable American spelling) are optional
 % So are Acknowledgments (proper English spelling)
-    \chapter*{Acknowledgments}
-	I want to thank a few people.
+    %\chapter*{Acknowledgments}
+	%I want to thank a few people.
 
 % The preface is optional
 % To remove it, comment it out or delete it.
     %\chapter*{Preface}
 	%This is an example of a thesis setup to use the reed thesis document class.
 
-
-
-    \chapter*{List of Abbreviations}
-		You can always change the way your abbreviations are formatted. Play around with it yourself, use tables, or come to CUS if you'd like to change the way it looks. You can also completely remove this chapter if you have no need for a list of abbreviations. Here is an example of what this could look like:
-
-	\begin{table}[h]
-	\centering % You could remove this to move table to the left
-	\begin{tabular}{ll}
-		\textbf{ABC}  	&  American Broadcasting Company \\
-		\textbf{CBS}  	&  Columbia Broadcasting System\\
-		\textbf{CDC}  	&  Center for Disease Control \\
-		\textbf{CIA}  	&  Central Intelligence Agency\\
-		\textbf{CLBR} 	&  Center for Life Beyond Reed\\
-		\textbf{CUS}  	&  Computer User Services\\
-		\textbf{FBI}  	&  Federal Bureau of Investigation\\
-		\textbf{NBC}  	&  National Broadcasting Corporation\\
-	\end{tabular}
-	\end{table}
-
+%
+%
+%    \chapter*{List of Abbreviations}
+%		You can always change the way your abbreviations are formatted. Play around with it yourself, use tables, or come to CUS if you'd like to change the way it looks. You can also completely remove this chapter if you have no need for a list of abbreviations. Here is an example of what this could look like:
+%
+%	\begin{table}[h]
+%	\centering % You could remove this to move table to the left
+%	\begin{tabular}{ll}
+%		\textbf{ABC}  	&  American Broadcasting Company \\
+%		\textbf{CBS}  	&  Columbia Broadcasting System\\
+%		\textbf{CDC}  	&  Center for Disease Control \\
+%		\textbf{CIA}  	&  Central Intelligence Agency\\
+%		\textbf{CLBR} 	&  Center for Life Beyond Reed\\
+%		\textbf{CUS}  	&  Computer User Services\\
+%		\textbf{FBI}  	&  Federal Bureau of Investigation\\
+%		\textbf{NBC}  	&  National Broadcasting Corporation\\
+%	\end{tabular}
+%	\end{table}
+%
 
     \tableofcontents
 % if you want a list of tables, optional
@@ -145,7 +145,16 @@
 % The abstract is not required if you're writing a creative thesis (but aren't they all?)
 % If your abstract is longer than a page, there may be a formatting issue.
     \chapter*{Abstract}
-	The preface pretty much says it all.
+	
+	We are in the era of heterogeneous computing, where applications need to use more than one type of processor in order to improve performance. But programmers are not always taught how to best use these new processors, which results in poor use of hardware. To help the programmer, we suggest building a tool that combines results from dynamic parallelism detection and workload characterization. For parallelism detection, we built a tool which detects whether parallelism exists in loops, and if not, why it is not. We confirm prior work that the naive implementation of the tool is memory intensive, so we implement two different methods of reducing memory consumption, one based on stride compression as introduced by SD$^3$. We find that combined with loop iteration size and variance data, this tool can be effective in guiding the programmer's parallelization efforts. %We then 
+	We gather workload characterization metrics that could be combined with the parallelism information to make the tool useful in distinguishing between code that is effective on GPUs vs. CPUs, but we did not make use of these metrics due to time limitations. 
+	
+	% and one based on bit compression. the trade-offs of parallelizing their code on CPUs and GPUs, we built a tool which detects parallelism 
+
+	
+	%creates confusion and risk 
+
+	%The preface pretty much says it all.
 
   \mainmatter % here the regular arabic numbering starts
   \pagestyle{fancyplain} % turns page numbering back on
