@@ -168,17 +168,8 @@
 \chaptermark{Introduction}
 \markboth{Introduction}{Introduction}
 
-	%\section{Benefits of GP-GPU Computing}
-	
+
 		Traditional general purpose processors are designed to be easy to program while being as fast as possible at many different computation tasks. This allows the vast majority of applications to use general purpose processors exclusively. 
-		
-		%Programming languages focus on 
-		%Sequential execution of code is limited by the As clock speeds stopped increasing in the early 2000s, hardware developers tried various methods to make sequential code run in parallel, but these methods could not scale.
-		
-		% limited by the   stopped started being limited by how 
-		%But there are limits to how fast code can execute . 
-		
-		%But some applications require higher performance than general purpose processors can provide. 
 		
 		For a long time, computer hardware tried to make the standard model of computation as fast as possible, inventing various methods such as instruction level parallelism that allowed the programmer to think of code sequentially while in actuality the code was running in parallel.
 		But these methods could not scale well and eventually, the limits of these methods were found. To keep software performance improving, hardware moved to a many-core model where several cores executed code independently. Programming languages started including multi-threading features, and software developers were forced to learn how to reason about parallel programming. 
@@ -192,54 +183,18 @@
 		
 		This concept of running a single application of different hardware is called heterogeneous computing. 
 		
-		%Sometimes, hardware can be built to run specific applications. Tasks like network routing or bitcoin mining require extremely high performance, and so hardware was developed to run specific procedures which these applications rely on. But this hardware is often useless for other applications. This hardware also cannot be used in user facing applications because the user usually does not have access to the hardware.  % which demands highly specialized hardware that performs a specific set of tasks as quickly as possible, and generally has limited programmability. 
 		
 	\section{Challenges of heterogeneous computing}
 	
 		Heterogeneous computing offers many challenges for the programmer. Since the different hardware have different characteristics and interfaces, different programming languages, libraries, and tools need to be used when coding for each platform. The languages and tools for accelerators are generally much less user friendly than ones for general purpose processors, and programmers are less familiar with them. %, and require some experienc. 
 		%	
 		This means that programmers often have to put substantial effort into porting their code to a accelerator like a GPU.
-		%programmers need to deeply understand the architecture of each hardware platform. 
-		%
-		%General purpose programming languages cannot compile to efficient GPU code. 
-	 % language like CUDA, and making the required adjustments to their other code. 
-		%Programming languages depend on models of computation that make code easy to reason about. These models are almost always sequential, deterministic, and assume random access memory. Threads are managed as independent.
-		
-		%Most applications cannot use even the most general accelerators effectively. If they could, then it could not be called an accelerator. 
 		
 		Even worse, there is no guarantee that an application will run faster on an accelerator. Take a GPU as an example. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively because the application depends on certain hardware characteristics of general purpose processors that are different on GPUs. %Programmers are often be unaware of ways to best use the hardware. %depends on features that are absent from GPUs, like efficient handling of divergent branches. 
 		So when a programmer tries to parallelize an application, and does not have a deep understanding of GPU architecture, they are taking a certain risk: all that extra work may be for nothing. 
 		
 		Since the benefits of heterogeneous computing are potentially so large, reducing the risks and making heterogeneous programming more accessible to non-experts could bring significant benefits.
 		
-		
-		%independent, 
-		%Computer scientists tried to make the standard model of computation as fast as possible, inventing various methods such as instruction level parallelism that allowed the programmer to think of code sequentially while in actuality the code was running in parallel.
-		
-		
-		
-		%But eventually, the limits of these methods were made apparent, and it became clear that hardware would need to have some help from the programmer to run code in parallel.
-		%Programming languages started supporting multi-threading.
-		
-		
-%	\section{GPGPU}
-%		
-%		So there is a trade off between generality and performance, and different hardware take different positions on this tradeoff. %Some hardware is a compromise between generality and performance.  % fallen in between these two extremes. Of particular note,
-%		Graphics Processing Units (GPUs) are a type of specialized hardware that was developed to speed up graphics for video games. GPUs have become extremely widespread, being ubiquitous in desktops, laptops, and phones. % This allows a GPU to run certain algorithms much  %But as they became more general to support different types of procedures for graphics, they became able to 
-%		While GPUs were designed for video games, they have since been used for many different applications. To reflect this, they are sometimes called general purpose GPUs, or GP-GPUs.
-%		Programming languages such as CUDA and OpenCL have been developed to make programming GPU procedures easier while allowing access to the GPU hardware features. These languages allow the programmer to use the GPUs features effectively to accelerate their programs.
-%		To use a GPU, an application would send data and code to the GPU, which would use the code to process the data and send back the results. Since the application uses different hardware to achieve a single goal, this is called heterogeneous computing. 
-%		
-%		GPUs have been especially successful at accelerating numeric computations that are important in the sciences (for example, matrix multiplication). 
-%		This shift towards GPU computing has resulted in an order of magnitude gain in performance and power consumption of certain scientific applications that has allowed for completely new types of algorithms and methods to be used. For example, GPUs are credited as a major factor for deep learning reaching its current prominence. %for numerical programs has 
-%		
-	
-	%\section{Current solutions}
-	
-	%	libraries
-		
-	%	languages
-	
 	\section{Our solution}
 	
 		This thesis focuses on a small part of the larger challenge of heterogeneous computing. First, we focus our attention only on CPUs and GPUs, and ignore other types of hardware. This is only because we are restricted by time, we hope that our work would easily extend to other highly programmable accelerators like FPGAs.
@@ -1078,7 +1033,8 @@ for(int i = 1; i < 12; i = i + 3){
 			
 			Strides are also added to the StrideTable during new memory accesses and merges. 			
 			When possible, strides need to be merged into existing strides in the table. This is critical for compression (see section \ref{sse:stride-descr}.5). The StrideTable is designed to make this process simple and efficient. 
-			At a high level, the StrideTable is a set of ordered sets of strides (see Figure \ref{fig:stride-table}). %The outer set ensures that a particular inner set contains only strides which are mergeable if they adjoin. The inner ordered set is used to check if the strides do adjoin, in which case, they are mergeable.
+			At a high level, the StrideTable is a set of ordered sets of strides. 
+			Figure \ref{fig:stride-table} shows a precise outline of how the table is structured.  %The outer set ensures that a particular inner set contains only strides which are mergeable if they adjoin. The inner ordered set is used to check if the strides do adjoin, in which case, they are mergeable.
 			
 			\begin{figure}[h]
 				\caption{Stride Table}
@@ -1102,8 +1058,7 @@ for(int i = 1; i < 12; i = i + 3){
 			\end{tabular}
 		
 			In the table above, stride 1 and 4 are mergeable, while no other pair of strides are. 
-			Stride 2, with a different stride distance from the rest so it is not be mergeable with the others. Stride 3 is not mergeable with strides 1 and 4 because they contain only even elements, while stride 3 contains only odds. This merging can be captured mathematically with the stride start modulo the stride length. In contrast, note the first element of stride 1: element 4 is two after the last element of stride 4, 2. So the stride with start 0, last 8, and stride distance 2 contains exactly the same element. % if the ends of stride 1 and 4 are extended, they could become the same stride, with start 0, last 8. It turns out that this idea of boundary extension is captured perfectly with the stride start modulo the stride distance. 
-			% These criteria ensure that all the strides in the inside set of strides which are all mergeable. 
+			Stride 2, with a different stride distance from the rest so it is not be mergeable with the others. Stride 3 is not mergeable with strides 1 and 4 because they contain only even elements, while stride 3 contains only odds. This merging can be captured mathematically with the stride start modulo the stride length. In contrast, note the first element of stride 1: element 4 is two after the last element of stride 4, 2. So the stride with start 0, last 8, and stride distance 2 contains exactly the same element. 
 			
 			Now, the inner set needs to merge all adjoining strides. This problem is exactly the problem of merging of overlapping intervals, which is already well understood. But to be complete, a solution outline will be detailed here. % union of intervals, and is a much more well known pronl
 			
@@ -1139,14 +1094,14 @@ for(int i = 1; i < 12; i = i + 3){
 			The AddressSet is implemented as a bit compressed set as described in Section \ref{s:bit-set-comp-impl}. That is, it is a table where each entry is a key value pair where the key is an integer which is equal to the $\lfloor \text{address}/\text{BlockSize} \rfloor$, and the value is a bit array of length BlockSize. Figure \ref{fig:bitset} shows a summary of the data structure. 
 			
 			
-			\begin{figure}[H]
+			\begin{figure}[h]
 				\caption{AddressSet data structure}
 				\label{fig:bitset}
 				\includegraphics[scale=1.0]{bit_data.pdf}
 			\end{figure}
 		
 			The table is implemented with a C++ \texttt{map}.
-			The bit array is implemented with a C++ standard libary's \texttt{bitset} which has easy and fast intersection and union operations which are based on the C++ bitwise logical operators \texttt{\&} and \texttt{|}. Bit access and assignment are also made easy, treated syntactically similar to array access, but are implemented as a mix of array access and bit twiddling. %, and are generally a little slower than accessing ordinary arrays. %, but are still fast enough to 
+			The bit array is implemented with a C++ standard libary's \texttt{bitset} which has fast intersection and union operations which are based on the C++ bitwise logical operators \texttt{\&} and \texttt{|}. Bit access and assignment are also simple to use, treated syntactically similar to array access, but are implemented as a mix of array access and bit twiddling. %, and are generally a little slower than accessing ordinary arrays. %, but are still fast enough to 
 			
 			This allows new addresses to be added to the set with a single line of C++:
 			%
@@ -1156,8 +1111,10 @@ bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 			%
 			This line depends on a quirk of C++ \texttt{map}: new entries are automatically created when accessed for the first time. 
 			
+			\subsubsection{Other operations of AddressSet}
+			
 			The AddressSet has other operations that are implemented. For example, during conflict checking, the intersection of the set is taken, and during merging, the union of the set is taken. 
-			These operations follow a certain pattern. Take in-place set intersection (shown in Algorithm \ref{bitsetintersect}) as a representative example. The algorithm goes through one of the sets item by item (in this case, the destination set). If the item is not in the other set, then it is treated as if it were a sparse set. In this case, the element is simply removed. If the item is in both sets, then it uses the corresponding operation on the bitsets. In this case, C++'s the bitwise \texttt{\&} operator corresponds exactly to set intersection. This results in an efficient set intersection implementation. 
+			These operations follow a certain pattern. Take in-place set intersection (shown in Algorithm \ref{bitsetintersect}) as a representative example. The algorithm goes through one of the sets item by item (in this case, the destination set). If the item is not in the other set, then the element is simply removed, similarly to a sparse set. If the item is in both sets, then it performs C++'s the bitwise \texttt{\&} operator, which corresponds to set intersection on the bitsets. This pattern of treating the outer set as a sparse set, and the inner one as a dense set is also followed for union and set subtraction. 
 			
 			%So when a address is added to this set, it finds the block it is in by doing floor division by the BlockSize, and then setting the value of the address \% BlockSize bitset 
 			
@@ -1186,7 +1143,7 @@ bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 		
 		\subsection{Checking conflicts}
 			
-			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures.
+			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory. FindConflictingInstructions is only run when IsParallel returns false, since there would never be conflicts in a parallel loop. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures.
 			
 			\begin{figure}
 				\caption{Conflict-Check outline}
@@ -1200,7 +1157,7 @@ bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 			
 		\subsubsection{FindConflictingInstructions}
 		
-			FindConflictingInstructions is broken into two steps. First, lists of strides and points are gathered by using \texttt{extract}. Then, these strides and points are treated as intervals, and the intervals that overlap are found in FindOverlapping. Finally, whether the strides and points actually overlap is calculated in FilterConflicting.
+			FindConflictingInstructions is broken into two steps. First, lists of all the strides and points in the stride and point tables are gathered. Then, these strides and points are treated as intervals, and the intervals that overlap are found in FindOverlapping. Finally, whether the strides and points actually overlap is calculated in FilterConflicting.
 			
 		\subsubsection{Find Overlapping}
 		
@@ -1355,7 +1312,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			All key value sets are implemented with the C++ standard library \texttt{map}. Under the covers, this is implemented a binary search tree, but we only use functionality that hash tables also have. 
 			
-			To implement the bit array, we use the C++ standard library \texttt{bitset}, which allows for easy bit access and assignment, and also union and intersection operations. Under the covers, this is just an array of integers. The C++ \texttt{bitset}'s union, intersection, and set subtraction operations are extremely fast, because they are implemented with C++'s logical bitwise operations \texttt{|}, \texttt{\&}, and \texttt{\~}. These operations process all the bits in a single integer in parallel. 
+			To implement the bit array, we use the C++ standard library \texttt{bitset}, which allows for simple bit access and assignment, and also union and intersection operations. Under the covers, this is just an array of integers. The C++ \texttt{bitset}'s union, intersection, and set subtraction operations are extremely fast, because they are implemented with C++'s logical bitwise operations \texttt{|}, \texttt{\&}, and \texttt{\~}. These operations process all the bits in a single integer in parallel. 
 			
 			The address space is divided into blocks of 256 bytes, resulting in a 256 length bitset, which takes up 32 bytes of memory. This number was chosen because in the best case this allows for over 100 times the efficiency of the naive method, and in the worst case. it is only around 5 times worse than the naive method, since it only stores one blockset per instruction, and an instruction takes 8 bytes to store. 
 			
