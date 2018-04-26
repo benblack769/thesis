@@ -1790,7 +1790,7 @@ for(int i=h_graph_nodes[tid].starting;
 	\setcounter{chapter}{4}
 	\setcounter{section}{0}
 
-	This thesis set out to create a tool that helps programmers understand how their code might best utilize heterogeneous computing. We addresses several challenges involved with completing this goal, but left other challenges open for future work. %a first step towards this goal by creating a tool which evaluates loop level parallelism. Our efforts solved some 
+	This thesis set out to create a tool that helps programmers understand how their code might best utilize heterogeneous computing. We addresses several challenges involved with completing this goal, and left other challenges open for future work. %a first step towards this goal by creating a tool which evaluates loop level parallelism. Our efforts solved some 
 	
 	One of the problems encountered by prior work in parallelism detection is the massive memory overhead of the standard algorithm.
 	We confirmed that the simplest implementation uses too much memory to run real applications on real systems, and implement two methods of reducing the memory footprint: stride compression and bit compression. We found that these two methods use comparable magnitudes of memory on most of the applications run, and both vastly improve over the naive method. As programmers find new ways of making use of larger quantities of system memory, these techniques will not be good enough, so we hint that future work could combine bit and stride compression into a single tool. 
@@ -1799,7 +1799,9 @@ for(int i=h_graph_nodes[tid].starting;
 	Future work could make the tool more accessible to the programmer by producing more informative output. Future work could also produce more accurate results by incorporating static analysis. 
 	
 	Finally, we started addressing the challenge of how to inform the programmer about software characteristics other than parallelism, and their effects on hardware performance. We collect several loop level metrics other than parallelism, and suggest that they would be important in evaluating the effectiveness of accelerating the loops on GPUs vs. CPUs. 
-	Future work can determine how to pair those metrics with parallelism, how to interpret or model them in a way that has direct implications for performance, and evaluate if different metrics are needed. 
+	Future work can determine how to pair those metrics with parallelism, how to interpret or model them in a way that has direct implications for performance, and evaluate if different metrics are needed. Future work could also evaluate new metrics for hardware platforms other than CPUs and GPUs.
+	
+	If all these challenges are addressed, and a quality tool is produced, then programmers who use the tool should be much more able to evaluate what kind of parallelism, if any, is appropriate for different parts of their code. This will allow them to make more informed decisions about investing time to adapt the code to work on heterogeneous hardware. %working on those systems.
 	
 	%the metrics be paired with parallelism information somehow. 
 	
