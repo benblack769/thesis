@@ -898,6 +898,7 @@ for(int i = 1; i < 12; i = i + 3){
 		Similarly to the pairwise method, this tool collects loop level information by keeping a stack of data about each current active loop, and when the loop terminates, it does two things. First, it accumulates the information about the current loop instance into a summary of all the instances in the static loop. Then it simply passes its information to the loop below it on the stack, which accumulates that information with its own information. 
 		
 		\subsection{Stack and register memory}
+		\label{s:stack-reg-con}
 		
 		One problem with our approach to parallelism detection is that it has no way of detecting inductions. An example of an induction variable is the \texttt{i} in Code Example \ref{ce:induction}. According to the method of analysis demonstrated in Section \ref{s:nested-loop-demon}, the variable \texttt{i} carries a loop dependency because it is read in line 3 and then written in line 3. But this loop can be transformed into a parallel loop easily. This is a serious problem, since \texttt{i} is just a loop index that nearly every sequential loop has, including the ones that can be run in parallel. 
 		
@@ -937,7 +938,7 @@ for(int i = 0; i < max_size(A,B); i++){
 \end{lstlisting}
 \end{codeexample}	
 	
-		These register and stack dependencies seem to be rather rare in simple code, because finite quantities of memory rarely store crucial dependencies. But for more complex code, it seems likely that such dependencies occur with some frequency. So when interpreting the results of this work, it is important to realize that our analysis assumes that local variables do not cary dependencies in all of our results. 
+		These register and stack dependencies seem to be rather rare in simple code, because finite quantities of memory rarely store crucial dependencies. But for more complex code, it seems more likely that such dependencies occur with some frequency. So when interpreting the results of this work, it is important to realize that our analysis assumes that stack and register variables do not cary dependencies in all of our results. 
 		
 %		
 %		It matches information about specific loop iterations and instances by storing stacks of loop information. 
@@ -1546,6 +1547,10 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		%The effectiveness of the tools is questionable because it only detects trivially parallel loops: loops where each iteration is completely independent. Loops which can be parallelized with reductions or with locking mechanisms are not always identified as parallel. But we hope that this method will identify significant parallelism in many applications that can be parallelized on GPUs. % and will also help the programmer parallelize loops detected as not parallel. 
 		
+		\subsubsection{Caveat for the correctness of results}
+		
+		As discussed in Section \ref{s:stack-reg-con}, the parallelism detector does not detect dependencies carried through stack and register variables. This implied that it may not give correct results on certain algorithms where dependencies are carried by local variables. While we believe that this is uncommon, this remains an unverified assumption, so all the results in this section should be evaluated in the context of that assumption.
+		
 		\subsubsection{Significance of loops}
 		
 		Most loops are not worth investigating, and should be eliminated from further analysis. 
@@ -1722,6 +1727,7 @@ for(int i=h_graph_nodes[tid].starting;
 			%\item Making the output more user friendly
 			\item Making the vague observations in this section about scale of parallelism and variability of loops into precise metrics that could be easily used. 
 			\item  Add an overall score of GPU and CPU parallelism for each loop, perhaps with some kind of performance modeling
+			\item  Adding static analysis that detects register and stack dependencies as discussed in  section \ref{s:stack-reg-con}.
 		\end{itemize} 
 	
 	\section{Matching parallelism with other metrics}
@@ -1775,19 +1781,24 @@ for(int i=h_graph_nodes[tid].starting;
 	\setcounter{chapter}{4}
 	\setcounter{section}{0}
 
-	This thesis set out to create a tool that helps programmers understand how their code might best utilize heterogeneous computing. The first step towards this goal is automatically determining parallelism. We succeeded in creating a tool which evaluates trivial loop level parallelism in code. 
+	This thesis set out to create a tool that helps programmers understand how their code might best utilize heterogeneous computing. We addresses several challenges involved with completing this goal, but left other challenges open for future work. %a first step towards this goal by creating a tool which evaluates loop level parallelism. Our efforts solved some 
 	
 	One of the problems encountered by prior work in parallelism detection is the massive memory overhead of the standard algorithm.
-	We confirmed that the simplest implementation uses too much memory, and consider two methods of reducing the memory foot print: stride compression and bit compression. We found that while these algorithms had different memory consumption on different application, the two methods to use comparable magnitudes of memory, and both vastly improved over the naive method. As programmers find new ways of making use of larger quantities of system memory, these techniques will not be good enough, so we propose a way that the ideas could be combined into a single tool that uses less memory than either. 
+	We confirmed that the simplest implementation uses too much memory to run real applications on real systems, and implement two methods of reducing the memory footprint: stride compression and bit compression. We found that these two methods use comparable magnitudes of memory on most of the applications run, and both vastly improve over the naive method. As programmers find new ways of making use of larger quantities of system memory, these techniques will not be good enough, so we hint that future work could combine bit and stride compression into a single tool. 
 	
-	Another potential problem with this method of parallelism detection is that it does not find loops which are parallelizable, as it only discovers naive parallelism. 
+	Another potential problem with the standard method of parallelism detection is that only finds a certain types of parallelism: trivial loop level parallelism. This raises the question of whether it is useful in detecting parallelism that is actually important to program performance. We found evidence that it does detect important parallelism for most the applications studied. To the extent to which those applications are representative, then this tool does in fact detect real parallelism. 
+	Future work could make the tool more accessible to the programmer by producing more informative output. Future work could also produce more accurate results by incorporating static analysis. 
+	
+	Finally, we started addressing the challenge of how to inform the programmer about software characteristics other than parallelism, and their effects on hardware performance. We collect several loop level metrics other than parallelism, and suggest that they would be important in evaluating the effectiveness of accelerating the loops on GPUs vs. CPUs. 
+	Future work can determine how to pair those metrics with parallelism, how to interpret or model them in a way that has direct implications for performance, and evaluate if different metrics are needed. 
+	
+	%the metrics be paired with parallelism information somehow. 
 	
 	
-	
-	The most important aspect of heterogeneous computing is the importance placed on parallelism
+	%The most important aspect of heterogeneous computing is the importance placed on parallelism
 	%
-	a tool that 
-	We built a memory efficient parallelism detector, and found that it is useful in detecting important parallelism on real applications. We identified some possible metrics that could potentially 
+	%a tool that 
+	%We built a %memory efficient parallelism detector, and found that it is useful in detecting important parallelism on real applications. We identified some possible metrics that could potentially 
 
 
 
