@@ -1098,41 +1098,48 @@ for(int i = 0; i < max_size(A,B); i++){
 			\end{figure}
 			 
 			
-		When storing an element in the StrideTable, the outer set is matched on the instruction address, the stride distance, and the stride start modulo the stride distance. Strides which have these criteria in common are mergeable if they adjoin.  This is best explained with examples:
+			When storing an element in the StrideTable, the outer set is matched on the instruction address, the stride distance, and the stride start modulo the stride distance. Strides which have these criteria in common are mergeable if they adjoin.  This is best explained with examples:
 			
-			\begin{tabular}{ |c||c|c|c| } 
+			\noindent
+			\begin{tabular}{ |c||c|c|c|c| } 
 				\hline
-				Stride \# & Stride Distance & Stride start & Stride last \\ 
+				Stride \# & Stride Distance & Stride start & Stride last & Merge issue with stride 1 \\ 
 				\hline
 				\hline
-				1 & 2 & 4 & 8 \\ \hline
-				2 & 3 & 4 & 13 \\ \hline
-				3 & 2  & 5  & 9 \\ \hline
-				4 & 2  & 0  & 2 \\ 
+				1 & 2 & 4 & 8 & Mergeable \\ \hline
+				2 & 2  & 0  & 2 & Mergeable \\ \hline
+				3 & 3 & 4 & 13 & Stride distance \\ \hline
+				4 & 2  & 5  & 9 & Stride offset \\ \hline
+				5 & 2  & 14  & 20 & Not adjoined \\ 
 				\hline
 			\end{tabular}
 		
-			In the table above, stride 1 and 4 are mergeable, while no other pair of strides are. 
-			Stride 2, with a different stride distance from the rest so it is not be mergeable with the others. Stride 3 is not mergeable with strides 1 and 4 because they contain only even elements, while stride 3 contains only odds. This merging can be captured mathematically with the stride start modulo the stride length. In contrast, note the first element of stride 1: element 4 is two after the last element of stride 4, 2. So the stride with start 0, last 8, and stride distance 2 contains exactly the same element. 
+			In the table above, stride 1 is only mergeable with itself and with stride 2. The other strides have the three types of issues which can prevent stride merging. Stride 1 is mergeable with stride 2 because the strides have the same stride distance, the same offset (they are both on the same numbers modulo 2), and they also adjoin (if stride 4 were one item longer, then its last element would be stride 1's first element). 
+			Stride 3 has a different stride distance from the stride 1 so it is not be mergeable with it. Stride 4 is not mergeable with stride 1 because it contain only addresses which are even, while stride 4 contains only odd addresses. This merging problem can be captured generally mathematically with the stride start modulo the stride distance.
+			Finally, Stride 5 has the same stride distance and is on evens, but does not adjoin stride 1. The strides are not contiguous since 10 and 12 are not included in either, so stride 5 is not mergeable with stride 1.
 			
-			Now, the inner set needs to merge all adjoining strides. This problem is exactly the problem of merging of overlapping intervals, which is already well understood. But to be complete, a solution outline will be detailed here. % union of intervals, and is a much more well known pronl
+			The type of non-mergeable accesses represented by strides 3 and 4 are separated out with the outer map of the StrideTable, which seperates strides with differnet stride distances or stride starts into differnet ordered maps. 
 			
-			The inside set is ordered by the first element in the interval (which just happens to be a stride). Overlapping intervals are always merged, there will never be overlapping intervals in the set. This property will be used to guarantee efficiency.
+			Now, the inner map needs to merge all adjoining strides, while not merging strides like stride 5. This problem is exactly the problem of merging of overlapping intervals, which is already well understood. But to be complete, a solution outline will be detailed here. % union of intervals, and is a much more well known pronl
 			
-			To see how this can be done, consider the below example, where there are three intervals in the table, and one intervals being added. The first intervals cannot be merged with the added intervals, and the other two can. 
+			The inside map is ordered by the first element in the interval (which just happens to be a stride). Overlapping intervals are always merged, there will never be overlapping intervals in the map. This property will be used to guarantee efficiency.
+			
+			To see how this can be done, consider merging in stride 1 into the StrideTable when stride 2 and 5 were already added. 
+			
+			% below example, where there are three intervals in the table, and one intervals being added. The first intervals cannot be merged with the added intervals, and the other two can. 
 			
 			\newcommand{\bcl}{\cellcolor{black!50}}
 			\begin{tabular}{ |l|l| } 
 				\hline
-				Current intervals & (1,3),(4,5),(7,9) \\ 
+				Current intervals & (0,2),(14,20) \\ 
 				\hline
-				Added interval & (4,6) \\ 
+				Adding interval & (4,8) \\ 
 				\hline
 			\end{tabular}
 			
-			Since intervals in the table will never overlap, the interval directly below the added interval (the (1,3) interval) is the only possible interval that starts before it, and also could overlap.% In the example, this is (1,3) interval. 
+			Since intervals in the table will never overlap, the interval directly below the added interval (the (0,2) interval) is the only possible interval that starts before it, and also could overlap.% In the example, this is (1,3) interval. 
 			
-			The intervals above the added interval (in this case, (4,5) and (7,9)) can be efficiently checked because their first element will be less than the added interval's last element, and the intervals are ordered by their first item. %Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
+			The intervals above the added interval (in this case, (14,20)) can be efficiently checked because they are mergeable if their first element is less than the added interval's last element. %Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
 			
 			%Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stride-table}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
