@@ -1146,7 +1146,7 @@ for(int i = 0; i < max_size(A,B); i++){
 			
 			%Since memory addresses are simply integers, we will discuss the implementation in generic terms of an integer set, rather than discussing memory addresses. To store this integer set efficiently, we use bit compression as discussed in Section \ref{s:bit-compress}.
 			
-			The AddressSet is implemented as a bit compressed set as described in Section \ref{s:bit-set-comp-impl}. That is, it is a table where each entry is a key value pair where the key is an integer which is equal to the $\lfloor \text{address}/\text{BlockSize} \rfloor$, and the value is a bit array of length BlockSize. Figure \ref{fig:bitset} shows a summary of the data structure. 
+			The AddressSet is implemented as a bit compressed set as described in Section \ref{s:bit-set-comp-impl}. That is, it is a table where each entry is a key value pair where the key is an integer which is equal to the $\lfloor \text{address}/\text{BlockSize} \rfloor$, and the value is a bit array of length BlockSize. Figure \ref{fig:bitset} shows a summary of this data structure. 
 			
 			
 			\begin{figure}[h]
@@ -1156,20 +1156,22 @@ for(int i = 0; i < max_size(A,B); i++){
 			\end{figure}
 		
 			The table is implemented with a C++ \texttt{map}.
-			The bit array is implemented with a C++ standard libary's \texttt{bitset} which has fast intersection and union operations which are based on the C++ bitwise logical operators \texttt{\&} and \texttt{|}. Bit access and assignment are also simple to use, treated syntactically similar to array access, but are implemented as a mix of array access and bit twiddling. %, and are generally a little slower than accessing ordinary arrays. %, but are still fast enough to 
+			The bit array is implemented with a C++ standard library's \texttt{bitset} which has fast intersection and union operations which are based on the C++ bitwise logical operators \texttt{\&} and \texttt{|}. Bit access and assignment are also simple to use, treated syntactically similar to array access, but are implemented as a mix of array accesses and bit twiddling. %, and are generally a little slower than accessing ordinary arrays. %, but are still fast enough to 
 			
-			This allows new addresses to be added to the set with a single line of C++:
+			New addresses can be added to the set with a single line of C++:
 			%
 \begin{verbatim}
 bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 \end{verbatim}
 			%
-			This line depends on a quirk of C++ \texttt{map}: new entries are automatically created when accessed for the first time. 
+			This line depends on a quirk of the C++ \texttt{map} class: new entries are automatically created when accessed for the first time. 
 			
 			\subsubsection{Other operations of AddressSet}
 			
-			The AddressSet has other operations that are implemented. For example, during conflict checking, the intersection of the set is taken, and during merging, the union of the set is taken. 
-			These operations follow a certain pattern. Take in-place set intersection (shown in Algorithm \ref{bitsetintersect}) as a representative example. The algorithm goes through one of the sets item by item (in this case, the destination set). If the item is not in the other set, then the element is simply removed, similarly to a sparse set. If the item is in both sets, then it performs C++'s the bitwise \texttt{\&} operator, which corresponds to set intersection on the bitsets. This pattern of treating the outer set as a sparse set, and the inner one as a dense set is also followed for union and set subtraction. 
+			The AddressSet has other operations that are implemented. For example, during conflict checking, the intersection of the sets in the history and pending tables is taken, and during merging, the union of the sets is taken. 
+			These operations follow a certain pattern. In-place set intersection is shown in Algorithm \ref{bitsetintersect} as a representative example of how these operations are evaluated. 
+			%In line 2, the algorithm goes through the destionation of the sets item by item (in this case, the destination set). If the item is not in the other set, then the element is simply removed. If the item is in both sets, then it performs C++'s bitwise \texttt{\&} operator, which corresponds to set intersection on the bitsets. 
+			The general pattern is to treat the map of bitsets like a sparse set, and if the two maps have a matching entry, then treat the bitset as a dense set. This method results in linear time operations with respect to the map in the for loop. 
 			
 			%So when a address is added to this set, it finds the block it is in by doing floor division by the BlockSize, and then setting the value of the address \% BlockSize bitset 
 			
@@ -1198,7 +1200,7 @@ bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 		
 		\subsection{Checking conflicts}
 			
-			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer, either the loop is parallel, or not. The second, slower operation, FindConflictingInstructions, finds the particular instructions which accessed the conflicting memory. FindConflictingInstructions is only run when IsParallel returns false, since there would never be conflicts in a parallel loop. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures.
+			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer: either the loop is parallel, or it is not. The second, slower operation, FindConflictingInstructions, finds the particular pairs of instructions which accessed the conflicting memory. Later, these instructions are reported to the user. FindConflictingInstructions is only run when IsParallel returns false, since there would never be conflicts in a parallel loop. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures, which we describe below. 
 			
 			\begin{figure}
 				\caption{Conflict-Check outline}
@@ -1208,20 +1210,19 @@ bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 		
 		\subsubsection{IsParallel}
 		
-			The AddressSet makes this operation simple and fast to compute. The intersection of the history write set and the pending read set is checked. The loop iteration is parallel if and only if that intersection is empty. 
+			The AddressSet makes this operation simple and fast to compute. The intersection of the history write set and the pending read set is checked. The loop iteration is parallel if and only if that intersection is empty. If the intersection is not empty, this implies that a byte of memory has a read after write dependence which prevents the code from  being parallelized. 
 			
 		\subsubsection{FindConflictingInstructions}
 		
-			FindConflictingInstructions is broken into two steps. First, lists of all the strides and points in the stride and point tables are gathered. Then, these strides and points are treated as intervals, and the intervals that overlap are found in FindOverlapping. Finally, whether the strides and points actually overlap is calculated in FilterConflicting.
+			FindConflictingInstructions is broken into two steps. First, lists of all the strides and points in the stride and point tables are gathered. Then, these strides and points are treated as intervals, and the intervals that overlap are found in our FindOverlapping function. Finally, whether the strides and points actually overlap is calculated in our FilterConflicting function. 
 			
 		\subsubsection{Find Overlapping}
 		
 			FindOverlapping finds pairs of overlapping intervals. This is another well known interval problem. We use a sorted list technique. 
-			The idea behind the algorithm is to sort the lists of intervals by their first element, and then going through the two lists while storing information about one of the lists. 
+			The idea behind the algorithm is to sort the lists of intervals by their first element, and then going through all the intervals in one of the lists, and finding every element in the other list that overlaps with it. In order to do this efficiently, information about the second list is stored. % two lists while storing information about one of the lists. 
+			Algorithm \ref{algo:findoverlapping} gives a precise description of this algorithm. %It takes in two lists, $A$, and $B$, and immediately sorts them. $A$ is simply traversed sequentially. $B$ is traversed as $A$ is traversed while keeping some properties true. These properties are as follows. The current interval of $B$ is the first interval that starts after the interval from $A$ starts (the \texttt{ib} variable in Algorithm \ref{algo:findoverlapping}). It also stores the intervals in $B$ that started before $A$ starts, and end before it ends (the \texttt{before\_last}).
 			
-			Algorithm \ref{algo:findoverlapping} gives a precise description of this algorithm. It takes in two lists, $A$, and $B$, and immediately sorts them. $A$ is simply traversed sequentially. $B$ is traversed as $A$ is traversed while keeping some properties true. These properties are as follows. The current interval of $B$ is the first interval that starts after the interval from $A$ starts (the \texttt{ib} variable in Algorithm \ref{algo:findoverlapping}). It also stores the intervals in $B$ that started before $A$ starts, and end before it ends (the \texttt{before\_last}).
-			
-		 	From this, all the intervals from $B$ that overlap with the current \texttt{interval} from $A$ can be found quickly: The entire contents of \texttt{before\_last} overlaps with the \texttt{interval} from $A$. All intervals from $B$ which start before \texttt{interval} ends also overlap.
+		 	%From this, all the intervals from $B$ that overlap with the current \texttt{interval} from $A$ can be found quickly: The entire contents of \texttt{before\_last} overlaps with the \texttt{interval} from $A$. All intervals from $B$ which start before \texttt{interval} ends also overlap.
 			
 			%One of these lists will be gone through sequentially, call this list A.  go through one of the sorted lists, smallest to greatest, and moving through the the other list.  
 			
@@ -1235,42 +1236,53 @@ find_overlapping_intervals(A : interval list, B : interval list)
     sort A by first
     sort B by first
     overlap = Set()
-    // before_last contains all interval from B that start before the current interval from A
-    // starts and end after the current interval ends
+    // before_last contains all interval from B that start before 
+    // the current interval from A starts and end after the current
+    // interval ends
     before_last = vector() 
-    // ib is the first interval of B which starts after the interval from A starts. 
+    // ib is the first interval of B which starts after the interval
+    // from A starts. 
     ib = 0
     for interval in A
-        //removes elements from before_last efficiently
+        // removes elements from before_last efficiently
         new_before_last = vector()
         for item in before_last:
             if item.last >= interval.first:
                 new_before_last.append(item)
         before_last = new_before_last
         
-        //Find the ib that has the property for the current interval
-        //while adding in new elements to before_last
+        // Find the ib that has the property for the current interval
+        // while adding in new elements to before_last
         while B[ib].first() >= interval.first()
             if B[ib].last() >= interval.first()
                 before_last.append(B[ib])
             increment ib
 
-        //report overlaps for the intevals in before_last
+        // report overlaps for the intevals in before_last
         for bl in before_last
             overlap.add(bl,interval)
 
-        //report overlaps for the intervals which start after interval starts
-        for ib2 from ib until B[ib2].first > interval.last
+        // report overlaps for the intervals which start after interval
+        // starts
+        for ib2 = ib until B[ib2].first > interval.last
             overlap.add(B[ib2],interval)
+            ib2 = ib2 + 1
 \end{verbatim}
 \end{algorithm}
 		
 		
 		\subsubsection{Filter Non-conflicting}
 		
-			Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm to check if overlapping strides really do conflict. We found it difficult to work out the details of this algorithm, so instead, we decided to use other methods. In particular, the vast majority of strided conflicts will be much easier to check for conflicts. Many strides will be dense, meaning every byte in between the start and end of the interval will be accessed. Many other possible conflicting strides will have the same stride distance. And most of the remaining strides will have long interval overlap compared to the stride distances, which means that the ordinary GCD test gives the correct answer.
+			Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm to check if a pair of overlapping strides really do conflict. We found it difficult to work out the details of this algorithm, so we instead decided to use a different method. In particular, the vast majority of strided conflicts will be much easier to check for conflicts. We built our approach by making several observations about strides.
+			
+			\begin{enumerate}
+				\item Many strides will be dense, meaning every byte in between the start and end of the interval will be accessed. Any overlapping strides is assumed to conflict if one of them is dense. This assumption is in general false, and is a bug in our design that was caught too late to be removed. 
+				\item Many other possible conflicting strides will have the same stride distance. Then the strides conflict if the difference in the stride starts modulo the stride distance is zero. 
+				\item Many strides will have long interval overlap compared to the stride distances. Formally this is calculated by $\text{lcm}(\text{stride distance 1}, \text{stride distance 2}) < \text{interval operlap}$. In this case, the ordinary GCD test described in Section \ref{sse:stride-descr} test gives the correct answer.
+			\end{enumerate}
+			Our method verifies if an observation holds for a particular case. For example, in the first case, it checks if one of the two strides is dense. Then it uses the properties of the case to check if the strides really do conflict. For example, in the third case, by performing the GCD test to check if the strides conflict. 
 			%Our method simply checks if these cases apply, and if so, calculates the answer.
-			The few remaining cases can be checked with a slow algorithm which compares the strides element by element.
+			If none of the properties are found to hold for a given pair of strides, then the two strides are checked for conflicts with a slow algorithm which compares the strides element by element.
 			 
 			%In particular, it is important to note that having constant time comparison is not needed for algorithmic efficiency of the method. After all, each element of the stride is added one at a time, and it is only compari
 			
@@ -1278,11 +1290,15 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		
 		\subsubsection{Truncation of FindConflictingInstructions}
 			
-			Whether the loop is has conflicts or not, FindConflictingInstructions cannot be run for every iteration, or else the algorithm would run in quadratic time with the number of loop iterations, which is untenable. We reduce the number of times it runs to a constant number per loop instance, and to  by making the following observations; 
+			Whether the loop has conflicts or not, we do not want to run FindConflictingInstructions for every loop iteration or else the algorithm would run in quadratic time with respect to the number of loop iterations, which would be untenable. We reduce the number of times we run FindConflictingInstructions to a constant number per loop instance by making two observations: 
 			
-			If the loop iteration does not have any conflicts (discovered by running IsParallel), then we know that no instructions have conflicts, and we have no reason to run FindConflictingInstructions. 
+			\begin{enumerate}
+				\item If the loop iteration does not have any conflicts (discovered by running IsParallel), then we know that no instructions have conflicts, and we have no reason to run FindConflictingInstructions. 
+				\item If the loop does have conflicts, then the same conflicts most likely occur in many other loop iterations. So, after we have found the locations of conflicts in some constant number of loop iterations, we simply do not check later iterations. The information reported may be incomplete, but some conflicts will always be reported.% We accept the imperfection of reporting 
+			\end{enumerate}
+
 			
-			If the loop does have conflicts, then the same conflicts most likely occur in many other loop iterations. So after we have found the locations of conflicts in some constant number of loop iterations, we simply do not check later iterations. The information reported may be incomplete, but some conflicts will always be reported.% We accept the imperfection of reporting 
+
 			%The conflicting instructions are simply guides to the programmer. As such they do not have to be 100\% accurate. In particular, if there are some instruction conflicts which are reported, and others which are not, this is not a serious problem. So this information can be truncated.  
 			
 			Combined, these two truncation techniques mean that we have reasonably accurate reporting while only running FindConflictingInstructions a constant number of times for a particular loop instance.
@@ -1291,31 +1307,17 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 	\subsection{Loop termination}
 		
-			When a loop terminates, and it is not the outermost active loop, then it must be merged into its parent loop. Each Point and Stride is extracted from the outer loop's history table, and unless it is killed, it is added to the inner loop's pending table using the add method described in Section \ref{s:add-accesses}. 
+			When a loop terminates and it is not the outermost active loop, then it must be merged into its parent loop. Every Point and Stride is extracted from the outer loop's history table, and unless the point or stride has killed, it is added to the inner loop's pending table using the add method described in Section \ref{s:add-accesses}. 
 		
-		\subsubsection{Killing}
+		\subsubsection{Killing points and strides}
 		
 			Recall that when a history table is merged into the outer loop's pending table, killed addresses must not be added to the pending table. 
-			The SD$^3$ algorithm removes killed points and strides by a similar algorithm to their conflict-check method. We used AddressSets to do this instead. Given a particular point or stride, we simply use the AddressSet to check if the bytes that point or stride describe are killed. Strides and points are only removed if every byte they reference is killed. This could result in false positive dependencies, but it seems unlikely that partially killed points and strides are an important case. 
+			The SD$^3$ algorithm removes killed points and strides by a similar algorithm to their conflict-check method. We used AddressSets to do this instead. Given a particular point or stride, we simply use the AddressSet to check if the bytes that point or stride describe have been marked as killed. Strides and points are only removed if every byte they reference is killed. This could result in false positives when identifying conflicts. But we do not belive that this will be a common occurrence. %but it seems unlikely that partially killed points and strides are an important case. 
 %			
 %			AddressSets are first killed with set subtraction, and then unioned into the appropriate set. 
 %			Stride and Point tables are merged by simply extracting every Point or Stride from the source table, and adding them one at a time into the destination table using the add method . 
 %			
 		
-			
-			%The Bit table stores overall memory accesses, independently of the instruction it was accessed.
-			%This is in contrast to Point and Stride tables, which do store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information for performance reasons. In particular, it allows us to improve the performance of certain operations which do not need instruction information. 
-			
-			
-			%The Bit Table stores information about the memory accesses independently from the instruction at which it was accessed, whereas 
-			
-			
-			%The LoopInstance object, which keeps track of all information for a loop, has separate tables for reads and writes
-		
-			%The data structures which implement point and stride tables are optimized for efficient merging, instead of efficient conflict checking. The details of their data structures will be explained when explaining merging. They have two methods, an "add" method, which simply adds an item to the table, and an extract method, which gets all current items in the table.
-			
-			
-			%\includegraphics[scale=0.6]{FullLoopData.pdf}
 					
 		\section{Bit Compression Implementation}
 			
