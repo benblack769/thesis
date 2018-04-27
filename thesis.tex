@@ -146,7 +146,7 @@
 % If your abstract is longer than a page, there may be a formatting issue.
     \chapter*{Abstract}
 	
-	We are in the era of heterogeneous computing, where applications need to use more than one type of processor in order to improve performance. But programmers are not always taught how to best use these new processors, which results in poor use of hardware. To help the programmer, we suggest building a tool that combines results from dynamic parallelism detection and workload characterization. For parallelism detection, we built a tool which detects whether parallelism exists in loops, and if not, why it is not. We confirm prior work that the naive implementation of the tool is memory intensive, so we implement two different methods of reducing memory consumption, one based on stride compression as introduced by SD$^3$. We find that combined with loop iteration size and variance data, this tool can be effective in guiding the programmer's parallelization efforts. %We then 
+	We are in the era of heterogeneous computing, where applications need to use more than one type of processor in order to improve performance. But programmers are not always taught how to best use these new processors, which results in poor use of hardware, lost performance, and lost power savings. One challenge for the programmer is that these new processors often rely on software to define parallel execution of code; unfortunately, programmers often have limited experience dealing with the problems associated with writing parallel applications. To help the programmer, we suggest building a tool that combines results from dynamic parallelism detection and workload characterization. For parallelism detection, we built a tool which detects whether parallelism exists in loops, and if not, determines why it does not. We confirm prior work that the naive implementation of the tool is memory intensive, so we implement two different methods of reducing memory consumption, one based on stride compression as introduced by SD$^3$. We find that combined with loop iteration size and variance data, this tool can be effective in guiding the programmer's parallelization efforts. %We then 
 	We gather workload characterization metrics that could be combined with the parallelism information to make the tool useful in distinguishing between code that is effective on GPUs vs. CPUs, but we did not make use of these metrics due to time limitations. 
 	
 	% and one based on bit compression. the trade-offs of parallelizing their code on CPUs and GPUs, we built a tool which detects parallelism 
@@ -1626,7 +1626,7 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		The scale of the parallelism is one of the most important considerations when evaluating what sort of hardware to run the loop on. There are two aspects to scale. 
 		
-		First, there is the number of threads the work can be divided into. GPUs can run thousands of threads in parallel, where CPUs can at most run a few dozen. Since loops iterations are usually uniform, this can be estimated with the number of iterations in a loop instance. 
+		First, there is the number of threads the work can be divided into. GPUs can run thousands of threads in parallel, while CPUs can at most run a few dozen. Since loop iterations are usually uniform, this can be estimated with the number of iterations in a loop instance. 
 		
 		Second, there is the amount of work that is done in each thread. Unlike idealized parallelism, real world parallelism on both CPUs and GPUs requires substantial time for the hardware to divide the work into parallel threads at runtime. This means that loops which do little work per iteration and have few iterations may not be effectively divided onto threads on either GPUs or CPUs. 
 		
@@ -1642,19 +1642,16 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		Figure \ref{fig:paralleism-scale} plots these two metrics for the important parallel loops in all the applications. 
 		
-		\subsubsection{Questionable parallelizability of some important parallel loops}
+		CPUs can run a small number of threads effectively, and are ideal for parallelizing loops with a small number of iterations where each iteration does substantial work (upper left, colored red). GPUs are ideal for loops which have a large number of iterations (colored green).Loops which have a middling number of iterations (colored blue), and also have substantial work done per iteration (upper part of the graph), could be parallelized more effectively on a GPU or a CPU depending on additional details of the hardware under consideration. %If the programmer is targeting a server with 32 hardware threads, then that might result in a different evaluation than if the platform is a laptop with 4 hardware threads.%ifFor example in a decision between a laptop with 4 hardware threads and a integrated graphics card with 
 		
-		The loops in the bottom left of Figure \ref{fig:paralleism-scale} may not be parallelizable because the overhead of distributing iterations of the loop onto either CPU or GPU threads may be greater than the benefit of parallelizing the loop. 
+		%\subsubsection{Questionable parallelizability of some important parallel loops}
 		
-		There are types of parallelism which do not involve threads, such as CPU vectorized instruction. There are also optimizations, such as thread pools, which can minimize overhead of thread processing. Finally, sometimes parallelizable nested loops can be combined into a single parallel loop which does more work. But until further investigation, the loops on the bottom left corner of Figure \ref{fig:paralleism-scale} may not be large enough to parallelize. 
+		However, the loops in the bottom left of Figure \ref{fig:paralleism-scale} may not be parallelizable on hardware because the overhead of distributing iterations of the loop onto either CPU or GPU threads may be greater than the benefit of parallelizing the loop. The parallelism detection tool should inform the programmer about this problem, or the programmer may be misled by the idealized analysis into thinking that the loop would be valuable to parallelize.
 		
-		\subsubsection{Scale of parallelism on CPUs vs. GPUs}
+		%There are types of parallelism which do not involve threads, such as CPU vectorized instruction. There are also optimizations, such as thread pools, which can minimize overhead of thread processing. Finally, sometimes parallelizable nested loops can be combined into a single parallel loop which does more work. But until further investigation, the loops on the bottom left corner of Figure \ref{fig:paralleism-scale} may not be large enough to parallelize. 
 		
-		CPUs can run a small number of threads effectively, and are ideal for parallelizing loops with a small number of iterations (colored red).%, and also have substantial work done each iteration (near the top). There are three such important loops in the applications. 
-		%
-		GPUs are ideal for loops which have a large number of iterations (colored green).%, and have non-trivial work done each iteration (not at the bottom left). 
-		%
-		Loops which have a middling number of iterations (colored blue), and also have substantial work done per iteration (upper part of the graph), could be parallelized more effectively on a GPU or a CPU depending on the hardware under consideration. %If the programmer is targeting a server with 32 hardware threads, then that might result in a different evaluation than if the platform is a laptop with 4 hardware threads.%ifFor example in a decision between a laptop with 4 hardware threads and a integrated graphics card with 
+		%\subsubsection{Scale of parallelism on CPUs vs. GPUs}
+		
 		
 		%CPU threads have substantial overhead: even using optimizations to reduce thread overhead like thread pools, it is not always beneficial to parallelize loops with little work in the inside of the loop, such as the loops near the bottom and left of the plot. 
 		
@@ -1672,18 +1669,18 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		\subsubsection{Uniformity of useful parallel loops}
 		
-		It greatly simplifies analysis to assume that important parallel loops are uniform, i.e., all the loop iterations do the same amount of work. While this is true for most loops, some loops have substantial and problematic variability in iteration size that can impact parallelizability. 
+		It greatly simplifies analysis to assume that important parallel loops are uniform, i.e., all the loop iterations do the same amount of work. Notably, this assumption was utilized in our analysis of parallelizability of applications and scale of parallelism. While this is true for many loops, some loops have substantial variability in iteration length that can impact analysis of parallelizability as well as the type of parallel architecture the loop is most suited for. 
 			
-		To see why this is a problem, consider the idealized parallel machine where infinite threads can run in parallel. Consider a loop with 1000 iterations that can run in parallel, but one of those loop iterations takes as much time all the others combined. In this case, overall loop performance can at most be doubled. But if you assume uniformity of iterations, then performance would be calculated to increase by 1000 times, so the actual and predicted speedup would be off by a factor of 500. In real massively parallel machines, this problem can be even worse, since each thread of a massively parallel machine like a GPU is typically slower than a thread of a CPU. So a parallel version of a loop could potentially run much slower than a sequential one. 
+		To see why this is a problem, consider the idealized parallel machine where an infinite number of threads can run in parallel. Consider a loop with 1000 iterations that can run in parallel, but one of those loop iterations takes as much time all the others combined. In this case, overall loop performance can at most be doubled, since the one iteration takes up half of the sequential time. But if you assume uniformity of iterations, then performance would be calculated to increase by 1000 times, so the actual and predicted speedup would be off by a factor of 500. %In real massively parallel machines, this problem can be even worse, since each thread of a massively parallel machine like a GPU is typically slower than a thread of a CPU. So a parallel version of a loop could potentially run much slower than a sequential one. 
 		%So non-uniform loops have serious implications to parallelizability. %This is even more important in the case of massively parallel hardware, like GPUs, since each thread is slower than a GPU thread. 
 		
-		Luckily, for the applications chosen, most loops are roughly uniform. Figure \ref{fig:uniformity-tail-etc} shows a metric of uniformity plotted over the number of iterations per loop instance. The metric chosen is the maximum iteration size over the mean size. Only loops which could speed up the program by 10\% or more assuming idealized parallelism are shown. 
+		Luckily, for the applications we examined, most loops are roughly uniform. Figure \ref{fig:uniformity-tail-etc} shows a metric of uniformity plotted over the number of iterations per loop instance. The metric chosen is the maximum iteration length over the mean length. Only loops which could speed up the program by 10\% or more assuming idealized parallelism are shown. 
 		
-		The two dots in the top left of the graph are loops which have serious problems for parallelizability. They only have 10 loop iterations each on average, but the maximum iteration size is 10 times the mean iteration. This means that performance may not be increased substantially by parallelization, since a single iteration dominates the runtime of the loop. 
+		The two dots in the top left of the graph are loops which have serious problems for parallelizability. They only have 10 loop iterations each on average, but the maximum iteration length is 10 times the mean iteration length. This means that performance may not be increased substantially by parallelization, since a single iteration dominates the runtime of the loop. 
 		
-		The loop that appears in the top right of the graph is not so problematic. After all, it has over 10,000 loop iterations. If the iterations are carefully distributed over threads, it is possible that the variance between iteration sizes would not have a significant impact on performance, since the smaller iterations could be coalesced together into threads comparable to the large thread.
+		The loop that appears in the top right of the graph is not so problematic. After all, it has over 10,000 loop iterations. If the iterations are carefully distributed over threads, it is possible that the variance between iteration lengths would not have a significant impact on performance, since the smaller iterations could be coalesced together into threads comparable in length to the large thread. But since the programmer has to do extra work to accomplish this, the tool should report this non-uniformity to the programmer.
 		
-		The loops which show moderate amounts of variance need to be similarly evaluated on a case by case basis. But 67\% of the important loops shown, the max iteration size is less than 10\% greater than the mean iteration size, so most of the important loops are in fact uniform. 
+		The loops which show moderate amounts of variance need to be similarly evaluated on a case by case basis. For 67\% of the important loops shown, the maximum iteration length is less than 10\% greater than the mean iteration length, so most of the important loops are in fact uniform. 
 		
 		%So a value of 10 means that the maximum 
 		
@@ -1705,7 +1702,7 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		This section suggests that this parallelism information can be rather useful to both the programmer and any further characterization of the code. Future work could create a tool which a programmer can easily use to evaluate parallelism. The programmer would provide the inputs to the application, and the analysis tool will tell the programmer where to consider different sorts of parallelism.
 		
-		A crude version of this tool was implemented to help debug the parallelism detector. It annotates the code with comments containing the instruction addresses of the loops and with information about conflicts. Code example \ref{ce:par-tool-output} shows an example of this output on some matrix multiplication code. Note that the actual tool outputs more information, and the output is truncated here for better presentation. 
+		A crude version of this tool was implemented to help debug the parallelism detector. It annotates the source code with comments containing the instruction addresses of the loops and with information about conflicts. Code example \ref{ce:par-tool-output} shows an example of this output on some matrix multiplication code. Note that the actual tool outputs more information, and the output is truncated here for better presentation. 
 		
 		\begin{codeexample}
 			\caption{Example output of parallelism tool}
@@ -1728,15 +1725,20 @@ for(int i=h_graph_nodes[tid].starting;
 		}
 		\end{verbatim}
 		\end{codeexample}
+	
+		In its current form, developer can use this tool to find parallel loops, and see how many iterations they run in. For example, the outer loop of the matrix multiplication has 0 conflicting iterations, which means it is parallelizable. This can help assure the programmer that parallelizing the loop is possible. 
+		%If the programmer also knows that parallelizing it would improve performance
 		
+		For loops which have conflicts, the developer can track down where these conflicts are in the source code. In this case, the inner loop has a conflict. This conflict is labeled by the loop identifier so the programmer can easily track down which conflicts match with which loop. %be found in a large codebase because the conflict is labeled by the loop identifier. 
+		 
 		Future work could improve the tool by:
 		
 		\begin{itemize}
-			\item Adding more useful information about the loops such as the length and variance of its iteration sizes
-			\item Summarizing the important parallel and possibly parallel loops to investigate further
+			\item Adding more useful information about the loops such as the length and variance of their iterations. This should help the programmer evaluate whether the loops would be profitable to parallelize.
+			\item Summarizing the important parallel and possibly parallel loops to investigate further. This may be important for a programmer to navigate large codebases with hundreds of loops. 
 			%\item Making the output more user friendly
-			\item Making the vague observations in this section about scale of parallelism and variability of loops into precise metrics that could be easily used. 
-			\item  Add an overall score of GPU and CPU parallelism for each loop, perhaps with some kind of performance modeling
+			%\item Making the vague observations in this section about scale of parallelism and variability of loops into precise metrics that could be easily used. 
+			\item  Add an overall score of GPU and CPU parallelism for each loop, perhaps with some kind of performance modeling. 
 			\item  Adding static analysis that detects register and stack dependencies as discussed in  section \ref{s:stack-reg-con}.
 		\end{itemize} 
 	
@@ -1766,9 +1768,14 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		\subsubsection{Variability of metrics in important parallel loops}
 		
-		These metrics will only be important in predicting overall performance if they are not consistent across all the loops. Figure \ref{fig:other-metrics} tries to capture single variable variance by showing how all the important parallel loops score on the different metrics. While this does not capture overall variance of these performance characteristics, it is a first cut on whether these metrics may turn out to be useful. 
+		These metrics will only be important in predicting overall performance if they are not consistent across all the loops. Figure \ref{fig:other-metrics} tries to capture single variable variance by showing how all the important parallel loops score on the different metrics. 
+		To interpret the importance of this figure, take the StridedAccessesAbove16 boxplot as an example. This boxplot shows three loops where over 50\% of accesses are strided accesses where the stride length is over 16 bytes. The rest of the loops are shown to have less than 20\% of this type of access. The significant difference between these groups of loops may have hardware implications that we can exploit to improve performance prediction.
+		The most important takeaway of this plot is that it does suggest that there is substantial variance within each of these metrics. 
+		While this does not capture overall variance of these performance characteristics, it is a first cut on whether these metrics may turn out to be useful. 
 		
-		Figure \ref{fig:other-metrics} does suggest that there is substantial variance within each of these metrics.
+		%Each boxplot is a proportion, but the different boxplots are not directly comparable. The fact that SwitchesOverInstructions only has low values is not concerning because even having 2\% of instructions be diverging branches may have serious implications for performance on GPUs. 
+		
+		%Figure \ref{fig:other-metrics} does suggest that there is substantial variance within each of these metrics. For example, 
 		
 		\begin{figure}
 			\caption{Other metrics of important parallel loops}
@@ -1782,7 +1789,7 @@ for(int i=h_graph_nodes[tid].starting;
 	
 		\subsection{Future work}
 		
-		Unfortunately, due to time restrictions, we were not able to use the metrics to evaluate loop performance on different hardware. Future work would combine metrics similar to these with parallelism summaries discussed in Section \ref{s:important-paralleism}, and build a predictive performance model which would indicate to a programmer if and how to parallelize the loop. Such information could be displayed to the programmer by a tool like is described in Section \ref{s:par-fut-work}.
+		Unfortunately, due to time restrictions, we were not able to use the metrics to evaluate loop performance on different hardware. Future work would combine metrics similar to these with parallelism summaries discussed in Section \ref{s:important-paralleism} and build a predictive performance model which would indicate to a programmer if and how to parallelize the loop. Such information could be displayed to the programmer by a tool like is described in Section \ref{s:par-fut-work}.
 
 \chapter*{Conclusion}
          \addcontentsline{toc}{chapter}{Conclusion}
