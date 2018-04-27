@@ -965,6 +965,7 @@ for(int i = 0; i < max_size(A,B); i++){
 %		\end{enumerate}
 		
 	\section{Workloads}
+		\label{s:workloads}
 		
 		To distinguish between applications that are best run on CPUs or GPUs, we first needed a good sample of programs with different characteristics. Some of these should be geared towards CPUs, and others should be likely candidates for GPU acceleration. To get a wide variety of applications, we gathered applications from two different benchmarks: Rodinia and Parsec.
 		
@@ -1419,14 +1420,18 @@ find_overlapping_intervals(A : interval list, B : interval list)
 	
 		\section{Intro}
 	
-		We have three main results: the memory improvement by using the compression methods, the potential usefulness of the parallelism detector for the programmer and for analysis, and the potential for matching parallelism with other metrics.
+		Having created the tools described in Chapter 2, we now evaluate the effectiveness of these tools when run on a set of applications. First we evaluate the memory consumption of the stride and bit compression implementations. Then, we examine how important the parallel loops are to the applications' performance. We select the parallel loops that are found to be important, and examine some characteristics of these loops including the degree of parallelism, the variance of the length of the loop iterations, and the scale of the loop. Finally, we examine the workload characterization metrics in important parallel loops. 
+		
+		%We also evaluate the degree and type of parallelism the tools find in the applications. We then focus attention on the most important parallel loops, and examine other characteristics of these loops found by the tool, including 
+	
+		%We have three main results: the , the potential usefulness of the parallelism detector for the programmer and for analysis, and the potential for matching parallelism with other metrics.
 	
 		\subsection{Running applications}
 		
-		All the results were obtained by running a set of applications.
-		Table \ref{all-applications-table} is a complete table of all the applications which data was collected for, the benchmark it originally came from, and the command line arguments which were used during collection. 
+		All the results were obtained by running a set of applications selected from the Rodinia and Parsec benchmark suites introduced in Section \ref{s:workloads}.
+		Table \ref{all-applications-table} lists all the applications we examined, the benchmark suites the applications came from, and the command line arguments used during our analysis. 
 		
-		Note that when the command line argument is a filename, it does not include the full path to the data file. The data files that are used are all ones that were included in the original benchmark, no new files were created. 
+		Note that when the command line argument is a filename, it does not include the full path to the data file. The data files that are used are all ones that were included in the original benchmark suite; no new files were created. 
 		
 		
 		\begin{table}
@@ -1466,12 +1471,11 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		
 	\section{Memory improvement of compression}
 		
-		%Much of the work of this thesis was the implementation of two compressed versions of pairwise method: stride compression, based on SD$^3$, and bit compression. The native method was also implemented for comparison. 
-		Recall that the effect of stride compression, and to a lesser extent bit compression, are contingent on the program characteristics. To make sure that the compression methods are effective, and to see how the two compression methods compare, we measured the memory consumption of these methods on the applications. 
+		Recall that the effect of stride compression on memory demands, and to a lesser extent bit compression, are contingent on program characteristics. To make sure that the compression methods we implemented are effective and to see how the two compression methods compare, we measured the memory consumption of these different approaches on the applications. 
 		
 		\subsubsection{Memory evaluation setup}
 		
-		The memory measurement technique used is not perfect. The maximum memory consumption was measured by querying the Unix \texttt{ps} utility approximately every 20ms over the entire run of the program. As such, the resulting memory consumption is only an approximation. In particular, if the program allocated memory, and immediately freed the memory before \texttt{ps} was queried again, that additional memory would not be measured. However, that measurement error could only have significant impact on programs with small memory consumption and run quickly, which certainly do not describe the pairwise method implementations.
+		The maximum memory consumption used by our tool while running an application was measured by querying the Unix \texttt{ps} utility approximately every 20ms over the entire run of our tool. The maximum of all such queries is reported as the maximum memory consumed. As such, the resulting memory consumption is only an approximation. In particular, if the program allocated memory and immediately freed the memory before \texttt{ps} was queried again, that additional memory would not be measured. We do not believe that this measurement issues will cause serious error in measuring our tool's memory consumption because the tool runs slowly and consumes large quantities of memory throughout the run. %However, that measurement error would only have a significant impact on programs with small memory consumption that run quickly,%, which certainly do not describe the pairwise method implementations.
 		
 		\subsubsection{Inadvisablilty of the naive method}
 		
