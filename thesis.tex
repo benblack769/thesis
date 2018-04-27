@@ -1004,11 +1004,11 @@ for(int i = 0; i < max_size(A,B); i++){
 			Recall from Algorithm \ref{basic-pariwise} that there are several main procedures in the pairwise method. 
 			
 			\begin{enumerate}
-				\item During a loop iteration, and when some memory is accessed, add the memory access and the instruction that accessed it to the pending table. ADD-ACCESS
+				\item During a loop iteration, and when some memory is accessed, add the memory access and the instruction that accessed it to the pending table. 
 				\item After a loop iteration finishes,
 				\begin{enumerate}
-					\item Check for conflicts between accesses in pending and history tables CONFLICT-CHECK
-					\item Merge pending table into history table MERGE
+					\item Check for conflicts between accesses in pending and history tables. This is refereed to as Conflict Check
+					\item Merge pending table into history table
 				\end{enumerate}
 				\item After an entire loop ends
 				\begin{enumerate}
@@ -1075,7 +1075,7 @@ for(int i = 0; i < max_size(A,B); i++){
 			\begin{figure}[h]
 				\caption{Point Table}
 				\label{fig:point-table}
-				\includegraphics[scale=0.8]{point_data.pdf}
+				\includegraphics[scale=1.0]{point_data.pdf}
 			\end{figure}
 		
 			
@@ -1095,7 +1095,7 @@ for(int i = 0; i < max_size(A,B); i++){
 			\begin{figure}[h]
 				\caption{Stride Table}
 				\label{fig:stride-table}
-				\includegraphics[scale=0.8]{stride_data.pdf}
+				\includegraphics[scale=1.0]{stride_data.pdf}
 			\end{figure}
 			 
 			
@@ -1242,7 +1242,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
     // ib is the first interval of B which starts after the interval from A starts. 
     ib = 0
     for interval in A
-        //
+        //removes elements from before_last efficiently
         new_before_last = vector()
         for item in before_last:
             if item.last >= interval.first:
@@ -1250,10 +1250,11 @@ find_overlapping_intervals(A : interval list, B : interval list)
         before_last = new_before_last
         
         //Find the ib that has the property for the current interval
-        increment ib until B[ib].first >= interval.first
-        
-        if B[ib].last >= interval.first
-            before_last.append(B[ib])
+        //while adding in new elements to before_last
+        while B[ib].first() >= interval.first()
+            if B[ib].last() >= interval.first()
+                before_last.append(B[ib])
+            increment ib
 
         //report overlaps for the intevals in before_last
         for bl in before_last
@@ -1798,15 +1799,15 @@ for(int i=h_graph_nodes[tid].starting;
 	\setcounter{chapter}{4}
 	\setcounter{section}{0}
 
-	This thesis set out to create a tool that helps programmers understand how their code might best utilize heterogeneous computing. We addresses several challenges involved with completing this goal, and left other challenges open for future work. %a first step towards this goal by creating a tool which evaluates loop level parallelism. Our efforts solved some 
+	This thesis set out to create a tool that helps programmers understand how their code might best utilize heterogeneous computing. It addresses several challenges involved with completing this goal and leaves other challenges open for future work. %a first step towards this goal by creating a tool which evaluates loop level parallelism. Our efforts solved some 
 	
-	One of the problems encountered by prior work in parallelism detection is the massive memory overhead of the standard algorithm.
-	We confirmed that the simplest implementation uses too much memory to run real applications on real systems, and implement two methods of reducing the memory footprint: stride compression and bit compression. We found that these two methods use comparable magnitudes of memory on most of the applications run, and both vastly improve over the naive method. As programmers find new ways of making use of larger quantities of system memory, these techniques will not be good enough, so we hint that future work could combine bit and stride compression into a single tool. 
+	One of the problems encountered by prior work in parallelism detection is the massive memory overhead of the naive algorithm.
+	We confirmed that the simplest implementation uses too much memory to run real applications on real systems, and implemented two methods for reducing the memory footprint: stride compression and bit compression. We found that these two methods use comparable magnitudes of memory on most of the applications examined, and both are vast improvements over the naive method. As programmers find new ways of making use of larger quantities of system memory, these techniques will not be good enough, so we hint that future work could combine bit and stride compression into a single tool. 
 	
-	Another potential problem with the standard method of parallelism detection is that only finds a certain types of parallelism: trivial loop level parallelism. This raises the question of whether it is useful in detecting parallelism that is actually important to program performance. We found evidence that it does detect important parallelism for most the applications studied. To the extent to which those applications are representative, then this tool does in fact detect real parallelism. 
+	Another potential problem with the naive method of parallelism detection is that only finds a certain type of parallelism: trivial loop level parallelism. This raises the question of whether it is useful in detecting parallelism that is actually important to program performance. We found evidence that it does detect important parallelism for most the applications studied. To the extent to which the applications we examined are representative, this tool does in fact detect real parallelism. 
 	Future work could make the tool more accessible to the programmer by producing more informative output. Future work could also produce more accurate results by incorporating static analysis. 
 	
-	Finally, we started addressing the challenge of how to inform the programmer about software characteristics other than parallelism, and their effects on hardware performance. We collect several loop level metrics other than parallelism, and suggest that they would be important in evaluating the effectiveness of accelerating the loops on GPUs vs. CPUs. 
+	Finally, we started addressing the challenge of how to inform the programmer about software characteristics other than parallelism and their effects on hardware performance. We collected several loop level metrics other than parallelism, and suggested that they would be important in evaluating the effectiveness of accelerating the loops on GPUs vs. CPUs. 
 	Future work can determine how to pair those metrics with parallelism, how to interpret or model them in a way that has direct implications for performance, and evaluate if different metrics are needed. Future work could also evaluate new metrics for hardware platforms other than CPUs and GPUs.
 	
 	If all these challenges are addressed, and a quality tool is produced, then programmers who use the tool should be much more able to evaluate what kind of parallelism, if any, is appropriate for different parts of their code. This will allow them to make more informed decisions about investing time to adapt the code to work on heterogeneous hardware. %working on those systems.
