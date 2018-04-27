@@ -758,7 +758,7 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		A simple way to MERGE two sets of strides is to join them together. However, this does not result in any compression. The online detection method generates strides for single accesses, which are immediately put in the pending table. So unless the adjoining strides in the history table are merged together with these strides during MERGE, the memory performance will not improve over the naive version. 
 		
-		Two strides are mergeable when they can be written as a single stride. For example \texttt{(first:1, last:10, interval:3)} and  \texttt{(first:13, last:22, interval:3)} can be merged, since the stride  \texttt{(first:1, last:22, interval:3)} covers the same elements as the two of them combined. On the other hand, \texttt{(first:2, last:8, interval:2)} and \texttt{(first:13, last:22, interval:3)} cannot be merged since simply extending the bounds of the stride cannot include all of the elements of both strides.
+		Two strides are mergeable when they can be written as a single stride. For example \texttt{(first:1, last:10, interval:3)} and  \texttt{(first:13, last:22, interval:3)} can be merged, since the stride  \texttt{(first:1, last:22, interval:3)} covers the same elements as the two of them combined. On the other hand, \texttt{(first:2, last:8,} \linebreak\texttt{interval:2)} and \texttt{(first:13, last:22, interval:3)} cannot be merged since simply extending the bounds of the stride cannot include all of the elements of both strides.
 		
 		SD$^3$ uses the interval tree described above to find possible candidates for mergable strides, and then checks further. If strides for a particular instruction are consistently not found to be mergable, then no further attempts are made to merge them. 
 		
@@ -1055,7 +1055,7 @@ for(int i = 0; i < max_size(A,B); i++){
 		\begin{figure}
 			\caption{Adding accesses}
 			\label{fig:add-access}
-			\includegraphics[scale=0.7]{add_access.pdf}
+			\includegraphics[scale=0.65]{add_access.pdf}
 		\end{figure}
 		
 		
@@ -1212,7 +1212,7 @@ bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 			\begin{figure}
 				\caption{Conflict-Check outline}
 				\label{fig:conflict-check}
-				\includegraphics[scale=1.0]{conflict-diagram-output.pdf}
+				\includegraphics[scale=0.9]{conflict-diagram-output.pdf}
 			\end{figure}
 		
 		\subsubsection{IsParallel}
@@ -1269,8 +1269,8 @@ find_overlapping_intervals(A : interval list, B : interval list)
         for bl in before_last
             overlap.add(bl,interval)
 
-        // report overlaps for the intervals which start after interval
-        // starts
+        // report overlaps for the intervals which start after
+        // interval starts
         for ib2 = ib until B[ib2].first > interval.last
             overlap.add(B[ib2],interval)
             ib2 = ib2 + 1
@@ -1278,14 +1278,14 @@ find_overlapping_intervals(A : interval list, B : interval list)
 \end{algorithm}
 		
 		
-		\subsubsection{Filter Non-conflicting}
+		\subsubsection{Filter Conflicting}
 		
 			Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm to check if a pair of overlapping strides really do conflict. We found it difficult to work out the details of this algorithm, so we instead decided to use a different method. In particular, the vast majority of strided conflicts will be much easier to check for conflicts. We built our approach by making several observations about strides.
 			
 			\begin{enumerate}
-				\item Many strides will be dense, meaning every byte in between the start and end of the interval will be accessed. Any overlapping strides is assumed to conflict if one of them is dense. This assumption is in general false, and is a bug in our design that was caught too late to be removed. 
+				\item Many strides will be dense, meaning every byte in between the start and end of the interval will be accessed. Any overlapping strides is assumed to conflict if one of them is dense. This assumption is not always true and could result in false positives. 
 				\item Many other possible conflicting strides will have the same stride distance. Then the strides conflict if the difference in the stride starts modulo the stride distance is zero. 
-				\item Many strides will have long interval overlap compared to the stride distances. Formally this is calculated by $\text{lcm}(\text{stride distance 1}, \text{stride distance 2}) < \text{interval operlap}$. In this case, the ordinary GCD test described in Section \ref{sse:stride-descr} test gives the correct answer.
+				\item Many strides will have long interval overlap compared to the stride distances. Formally this is calculated by $$\text{lcm}(\text{stride distance 1}, \text{stride distance 2}) < \text{interval operlap}$$ In this case, the ordinary GCD test described in Section \ref{sse:stride-descr} test gives the correct answer.
 			\end{enumerate}
 			Our method verifies if an observation holds for a particular case. For example, in the first case, it checks if one of the two strides is dense. Then it uses the properties of the case to check if the strides really do conflict. For example, in the third case, by performing the GCD test to check if the strides conflict. 
 			%Our method simply checks if these cases apply, and if so, calculates the answer.
@@ -1446,7 +1446,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		\begin{table}
 			\caption{Benchmark application and their inputs}
 			\label{all-applications-table}
-			\small
+			\scriptsize
 			\begin{tabular}{ |l|l|l| }
 				\hline
 				Application          & Suite   & Command line arguments  \\ \hline
@@ -1492,7 +1492,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		\begin{figure}
 			\caption{Memory consumption of parallelism detection on applications}
 			\label{fig:mem-comp-plot}
-			\includegraphics[scale=0.7]{plots/overall_plot.png}
+			\includegraphics[scale=0.65]{plots/overall_plot.png}
 		\end{figure}
 		
 		The naive method implementation often took up more memory than an ordinary desktop would have. The full results are plotted in Figure \ref{fig:mem-comp-plot}. Our system had 16GB of memory, and so the process was terminated after the program used over 14GB (on the plot, this is marked by an X). The naive method used more than 14GB of memory on 11 of the 21 applications, while neither the stride nor the bit compression methods used that much on any of the applications. This result confirms Kim et. al.'s observations that the naive method is not useful for important practical purposes, and that stride compression does help solve the problem.\footnote{\cite{Kim:2010}}
@@ -1535,8 +1535,8 @@ find_overlapping_intervals(A : interval list, B : interval list)
 	\label{code:bfs}
 		\begin{verbatim}
 for(int i=h_graph_nodes[tid].starting; 
-        i<(h_graph_nodes[tid].no_of_edges + h_graph_nodes[tid].starting); 
-        i++) {
+     i<(h_graph_nodes[tid].no_of_edges + h_graph_nodes[tid].starting); 
+     i++) {
     int id = h_graph_edges[i];
     if(!h_graph_visited[id]) {
         h_cost[id]=h_cost[tid]+1;
@@ -1721,13 +1721,15 @@ for(int i=h_graph_nodes[tid].starting;
 		int * A = random_array(size*size);
 		int * B = random_array(size*size);
 		int * C = random_array(size*size);
-		// LOOP 4006b9: ConflictedIterations: 0 TotalLoopIterations: 101
+		//LOOP 4006b9: ConflictedIterations: 0 TotalLoopIterations: 101
 		for(int i = 0; i < size; i++){
-		    // LOOP 4006ca: ConflictedIterations: 0 TotalLoopIterations: 10100 
+		    //LOOP 4006ca: ConflictedIterations: 0 TotalLoopIterations: 10100 
 		    for(int j = 0; j < size; j++){
-		        // LOOP 4006db: ConflictedIterations: 990000 TotalLoopIterations: 1010000
+		        //LOOP 4006db: ConflictedIterations: 990000
+		        //TotalLoopIterations: 1010000
 		        for(int k = 0; k < size; k++){
-		            // PARALLEL_CONFLICT FOR 4006db: LaterPC: 400701 EarlierPC: 400760 NumConflictIters: 990000
+		            //PARALLEL_CONFLICT FOR 4006db: LaterPC: 400701
+		            //EarlierPC: 400760 NumConflictIters: 990000
 		            C[i*size+j] += B[i*size+k] * A[k*size+j];
 		        }
 		    }
@@ -1760,7 +1762,7 @@ for(int i=h_graph_nodes[tid].starting;
 		\begin{table}
 			\caption{Other metrics collected}
 			\label{table:metric-names}
-			\begin{tabular}{ |p{4.5cm}|p{11cm}| }
+			\begin{tabular}{ |p{4.5cm}|p{9.6cm}| }
 				\hline
 				Metric name & Metric description \\
 				\hline \hline
