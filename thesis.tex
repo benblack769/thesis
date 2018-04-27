@@ -185,12 +185,13 @@
 		
 		But because each core of a many-core processor needs to execute general purpose code efficiently, each core is large, complex, and power hungry, so relatively few cores can be placed on a single chip. Today, high end many-core processors typically have at most two dozen cores. 
 		
-		This limitation was caused by the cores being general purpose. But hardware does not need to be general purpose. 
-		Individual applications often have a specific type of procedure that consumes the vast majority of the computing power. For these applications, hardware developers can build an accelerator that runs that procedure very efficiently, but does cannot run other types of code. The general purpose processor running the application can use the accelerator to compute that procedure quickly, and perform the rest of the computation itself. Encryption and decryption are commonly done with accelerators. 
+		This limitation was caused by the cores being general purpose. Hardware, however, does not need to be general purpose. 
+		Individual applications often have a specific type of procedure that consumes the vast majority of the computing power. For these applications, hardware developers can build an accelerator that runs that procedure very efficiently but does cannot run other types of code. The general purpose processor running the application can use the accelerator to compute that procedure quickly and then perform the rest of the computation itself. Encryption and decryption are commonly done with accelerators. 
 		
 		Some hardware takes a compromise between generality and performance. Notably, Graphics Processing Units (GPUs), originally designed to accelerate graphics in video games, have become general enough to run many types of computations, and now run many important numeric scientific calculations. 
 		
-		This concept of running a single application of different hardware is called heterogeneous computing. 
+		This concept of using different hardware processes to run a single application process is called heterogeneous computing. 
+		The computer hardware industry is starting to put several different types of processors and accelerators are on a single chip, so heterogeneous computing is gaining increasing importance.
 		
 		
 	\section{Challenges of heterogeneous computing}
@@ -199,14 +200,14 @@
 		%	
 		This means that programmers often have to put substantial effort into porting their code to a accelerator like a GPU.
 		
-		Even worse, there is no guarantee that an application will run faster on an accelerator. Take a GPU as an example. GPUs execute sequential code much slower than CPUs, and even if the code is massively parallel, GPUs may still be unable to execute it effectively because the application depends on certain hardware characteristics of general purpose processors that are different on GPUs. %Programmers are often be unaware of ways to best use the hardware. %depends on features that are absent from GPUs, like efficient handling of divergent branches. 
-		So when a programmer tries to parallelize an application, and does not have a deep understanding of GPU architecture, they are taking a certain risk: all that extra work may be for nothing. 
+		Even worse, there is no guarantee that an application will run faster on an accelerator. Take a GPU as an example. Because of the overhead involved in starting up work on a GPU, GPUs execute sequential code slower than CPUs. Even if the code is massively parallel, GPUs may still be unable to execute it effectively because the application depends on certain hardware characteristics of general purpose processors that are different then on GPUs. %Programmers are often be unaware of ways to best use the hardware. %depends on features that are absent from GPUs, like efficient handling of divergent branches. 
+		So when a programmer tries to parallelize an application and does not have a deep understanding of GPU architecture, they are taking a certain risk: all that extra work may be for nothing. 
 		
 		Since the benefits of heterogeneous computing are potentially so large, reducing the risks and making heterogeneous programming more accessible to non-experts could bring significant benefits.
 		
 	\section{Our solution}
 	
-		This thesis focuses on a small part of the larger challenge of heterogeneous computing. First, we focus our attention only on CPUs and GPUs, and ignore other types of hardware. This is only because we are restricted by time, we hope that our work would easily extend to other highly programmable accelerators like FPGAs.
+		This thesis focuses on a small part of the larger challenge of heterogeneous computing. First, we focus our attention only on CPUs and GPUs and ignore other types of hardware. This is only because we are restricted by time, we hope that our work would easily extend to other highly programmable accelerators.% like FPGAs.
 		
 		%This thesis focuses on two small parts of the larger challenge of heterogeneous computing:
 		
@@ -217,21 +218,21 @@
 			\item If so, then determining which kind of hardware would be more appropriate: CPU or GPU. 
 		\end{enumerate}
 	
-		We suggest creating a tool which can help the programmer understand how their code might perform on a many-core processor and a GPU assuming the code was ported to a GPU language. %, or whether traditional CPU multi-threading would be more appropriate. 
+		We suggest creating a tool which can help programmers understand how their code might perform on a many-core processor and a GPU assuming the code was ported to a GPU. %, or whether traditional CPU multi-threading would be more appropriate. 
 		%This tool would run on sequential CPU code, and would speculate about 
-		Ideally, this tool would not only give results based on how the code currently is, but give information to the programmer which would help them understand how the code could be changed to give better results on the types of hardware. 
+		Ideally, this tool would not only give results based on how the code currently is, but also give information to the programmer which would help them understand how the code could be changed to give better results on different types of hardware. 
 		
-		The results of this tool should allow an average programmer to make better decisions and assume less risk allowing them to potentially better accelerate their applications. 
+		The results of this tool should allow average programmers to make better decisions and assume less risk when deciding how to allocate their time, potentially allowing them to better accelerate their applications. 
 		
 	\section{Related work}
 	
 		There are two avenues of prior work which we try to combine in order to make such a tool: workload characterization and dynamic parallelism detection. 
 		
-		Workload characterization measures how applications use hardware features. Che et. al. created the Rodinia benchmark, to allow researchers to do workload characterization to understand differences between GPUs and CPUs.\footnote{\cite{Che:2010}} In particular, they want to understand the general types of workloads and data structures that work well on GPUs. In a way, they are examining the characteristics of categories of applications, where we are trying to investigate characteristics of specific applications. Workload characterization and how it relates to our goals is described in more detail in Section \ref{s:workload-characht}. 
+		Workload characterization measures the demands applications place on use hardware resources. Che et. al. created the Rodinia benchmark, to allow researchers to do workload characterization to understand differences between GPUs and CPUs.\footnote{\cite{Che:2010}} In particular, the goal for this benchmark suite is to understand the general types of workloads and data structures that work well on GPUs. In a way, they are examining the characteristics of categories of applications, where we are trying to investigate characteristics of specific applications. Workload characterization and how it relates to our goals is described in more detail in Section \ref{s:workload-characht}. 
 		
 		Parallelism detection analyzes which parts of sequential code might be run in parallel. Historically, applications of parallelism detection have been limited to CPUs. 
-		A commercial application of parallelism detection is Intel\textsuperscript{\textregistered} Advisor. The tool tells programmers which loops in the code might be parallelized, how they might be parallelized, and if not, where the problems are that are stopping it from being parallelized. 
-		Intel Advisor currently costs around \$1600 and is closed source, so we will be building our own tool similar to this one, but with fewer features. 
+		An example commercial application of parallelism detection is the  Intel\textsuperscript{\textregistered} Advisor. The tool tells programmers which loops in the code might be parallelized, how they might be parallelized, and if not, where the problems are that are stopping it from being parallelized. 
+		Intel Advisor currently costs around \$1600 and is closed source, so we will be building our own tool similar to this one but with fewer features. 
 		
 		%This thesis attempts to combine these two 
 	
@@ -245,8 +246,8 @@
 			\item Analyze the possible effectiveness of these tools to distinguish between GPU and CPU oriented applications.
 		\end{enumerate}
 	
-		Chapter 1 introduces parallelism detection and apporaches to improve memory efficiency. Chapter 2 describes implementation details of the tools, and Chapter 3 presents some results on how well these tools ended up working. 
-	`	%We hope these will make progress towards the eventual goal.
+		Chapter 1 introduces parallelism detection and approaches to improve memory efficiency. Chapter 2 describes implementation details of the tools, and Chapter 3 presents some results on how well these tools ended up working. 
+		%We hope these will make progress towards the eventual goal.
 	
 		
 \chapter{Dynamic parallelism detection}
