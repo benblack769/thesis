@@ -1001,32 +1001,31 @@ for(int i = 0; i < max_size(A,B); i++){
 			
 			At the highest level, a program has a single LoopStack, which contains a stack of LoopInstances. LoopInstances store all information about a particular active loop, including the pending and history tables.	Separate from the LoopStack, there is a StrideDetector for each instruction that accesses memory. 
 			
-			Recall from Algorithm \ref{basic-pariwise} that there are several main procedures in the pairwise method. 
+			Recall from Algorithm \ref{basic-pariwise} that there are several main procedures in the pairwise method:
 			
 			\begin{enumerate}
 				\item During a loop iteration, and when some memory is accessed, add the memory access and the instruction that accessed it to the pending table. 
 				\item After a loop iteration finishes,
 				\begin{enumerate}
-					\item Check for conflicts between accesses in pending and history tables. This is refereed to as Conflict Check
-					\item Merge pending table into history table
+					\item Check for conflicts between accesses in the pending and history tables. This is referred to as Conflict-Check.
+					\item Merge the pending table into history table
 				\end{enumerate}
-				\item After an entire loop ends
+				\item After an entire loop ends,
 				\begin{enumerate}
-					\item Merge all not killed accesses in the history table into the pending table 
+					\item Merge all non-killed accesses in the history table into the pending table 
 				\end{enumerate}
 			\end{enumerate}
 			
-			Our stride compression implementation has three main data structures inside a pending or history table. The purpose of these data structures is outlined here, and the details will be explained later. 
+			Our stride compression implementation has three main data structures inside each pending or history table. The purpose of these data structures is outlined here, and the details will be explained later. 
 			
 			\begin{itemize}
-				\item StrideTable: This table stores strided accesses and their instructions. Strides can be added efficiently to this table.
-				\item PointTable: This table stores non-strided accesses called points and their instructions. 
-				\item AddressSet: This structure is a set of memory addresses.
-				This is in contrast to Point and Stride tables, which also store the instruction associated with each memory access. We found it necessary to store this separate table which stores strictly less information as an optimization. %, without instructions. It has ordinary set operations, such as union, intersection, set subtraction, and inserting elements. It is used as an optimization only, as it stores strictly less information that the point and stride tables. 
+				\item StrideTable: This table stores strided accesses and the corresponding addresses of the instructions from which the strided memory accesses originated. Strides can be added efficiently to this table.
+				\item PointTable: This table stores non-strided accesses called points and the corresponding addresses of the instructions from which these memory accesses originate. 
+				\item AddressSet: This structure is simply a set of memory addresses.
+				This is in contrast to Point and Stride tables which also store the instruction addresses associated with each memory access. We found it necessary to store this separate table which stores strictly less information to enable one of our optimizations. %, without instructions. It has ordinary set operations, such as union, intersection, set subtraction, and inserting elements. It is used as an optimization only, as it stores strictly less information that the point and stride tables. 
 			\end{itemize}
 		
-			
-			These data structures store the content of the pending and history tables, but reads and writes are stored separately. See Figure \ref{fig:loopinstance} for how these tables fit inside the LoopInstance. 
+			These data structures store the content of the pending and history tables. Figure \ref{fig:loopinstance} shows how these tables fit inside the LoopInstance. Note that within a history or point table, there are two StrideTables, PointTables, and AddressSets, one table for reads, and one for writes.% are separate tables for each of but reads and writes are stored separately. See
 			
 			\begin{figure}[H]
 				\caption{LoopInstance Layout}
@@ -1037,17 +1036,17 @@ for(int i = 0; i < max_size(A,B); i++){
 			
 		\subsection{Adding accesses}\label{s:add-accesses}
 		
-		Algorithm \ref{new-memory-acc} describes the high level description of how new memory accesses are put in the pending table. Figure \ref{fig:add-access} shows the steps in a more readable format. The numbers in the figure correspond to the steps in the algorithm.% a lot of details out. These details will be explained here. 
+		Algorithm \ref{new-memory-acc} provides a high level description of how new memory accesses are put in the pending table. Figure \ref{fig:add-access} shows the steps as a flow chart. The numbers in the figure correspond to the steps in the algorithm.% a lot of details out. These details will be explained here. 
 		
 		\begin{algorithm}
 			\caption{New memory accesses}\label{new-memory-acc}
 			When a memory location $m$ is accessed by instruction $i$, and LoopInstance $L$ is at the top of the loop stack,
 			\begin{enumerate}
-				\item If the memory location $m$ is killed by the pending table's AddressSet, do nothing, and skip the rest of the steps. 
+				\item If the memory location $m$ is killed according to the pending table's AddressSet, do nothing and skip the rest of the steps. 
 				\item Add the bytes accessed by $m$ to the appropriate AddressSet.
-				\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride, and if so, its stride distance $d$. 
+				\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride. It it can be viewed as a stride, then look up the stride distance $d$ which was evaluated by the stride detector. 
 				%\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
-				\item If $m$ is a stride with stride distance $d$ then add it to the appropriate stride table.
+				\item If $m$ is a stride with stride distance $d$, then add it to the appropriate stride table.
 				\item If $m$ is not a stride, add it to the appropriate point table. 
 			\end{enumerate} 
 		\end{algorithm}
@@ -1066,9 +1065,9 @@ for(int i = 0; i < max_size(A,B); i++){
 		
 		\subsubsection{Adding points to the PointTable}
 		
-			Points (non-strided accesses) are added to the PointTable during new memory accesses and merges. The PointTable is designed so that identical points are not duplicated in the table. 
+			Points (non-strided accesses) are added to the PointTable during new memory accesses and merges of two tables. The PointTable is designed so that identical points are not duplicated in the table. 
 			
-			The PointTable is simply a set of points matched by instruction address and memory address (see figure \ref{fig:point-table}). When a point is added, its location in the set is checked. If there is an element there already, nothing happens, otherwise the point is added to the set. 
+			The PointTable is simply a set (no duplicates) of points matched by instruction address and memory address (see figure \ref{fig:point-table}). When a being added to the PointTable, we loop to see if the point already appears in the set.  If there is a matching element there already, nothing happens; otherwise, the point is added to the set. 
 			%Recall that Points are specified by instruction address, memory address, and access mode (read or write). 
 			%In Figure \ref{fig:point-table}, you can see that the a Point is stored for each instruction and memory address. 
 			
@@ -1099,7 +1098,7 @@ for(int i = 0; i < max_size(A,B); i++){
 			\end{figure}
 			 
 			
-			As shown in Figure \ref{fig:stride-table}, the outer set is matched on the instruction address, the stride distance, and the stride start modulo the stride distance. Strides which have these criteria in common are mergeable if they adjoin.  This is best explained with examples:
+		When storing an element in the StrideTable, the outer set is matched on the instruction address, the stride distance, and the stride start modulo the stride distance. Strides which have these criteria in common are mergeable if they adjoin.  This is best explained with examples:
 			
 			\begin{tabular}{ |c||c|c|c| } 
 				\hline
