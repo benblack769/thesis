@@ -1095,17 +1095,18 @@ for(int i = 0; i < max_size(A,B); i++){
 				\hline
 			\end{tabular}
 		
-			In the table above, stride 1 is only mergeable with itself and with stride 2. The other strides have the three types of issues which can prevent stride merging. Stride 1 is mergeable with stride 2 because the strides have the same stride distance, the same offset (they are both on the same numbers modulo 2), and they also adjoin (if stride 4 were one item longer, then its last element would be stride 1's first element). 
-			Stride 3 has a different stride distance from the stride 1 so it is not mergeable with it. Stride 4 is not mergeable with stride 1 because it contain only addresses which are even, while stride 4 contains only odd addresses. This merging problem can be captured generally mathematically with the stride start modulo the stride distance.
-			Finally, Stride 5 has the same stride distance and is on evens, but does not adjoin stride 1. The strides are not contiguous since 10 and 12 are not included in either, so stride 5 is not mergeable with stride 1.
+			In the table above, Stride 1 is only mergeable with itself and with Stride 2. The other strides have the three types of issues which can prevent stride merging. Stride 1 is mergeable with Stride 2 because the strides have the same stride distance, the same offset (they are both on the same numbers modulo 2), and they also adjoin (if Stride 4 were one item longer, then its last element would be Stride 1's first element). 
+			Stride 3 has a different stride distance from the Stride 1 so it is not mergeable with it. Stride 4 is not mergeable with Stride 1 because it contain only addresses which are even, while Stride 4 contains only odd addresses. This merging problem can be  
+			captured mathematically with the stride start modulo the stride distance.
+			Finally, Stride 5 has the same Stride distance and is on evens, but does not adjoin Stride 1. The strides are not contiguous since 10 and 12 are not included in either, so Stride 5 is not mergeable with Stride 1.
 			
-			The type of non-mergeable accesses represented by strides 3 and 4 are separated out with the outer map of the StrideTable, which separates strides with different stride distances or stride starts into different ordered maps. 
+			The type of non-mergeable accesses represented by Strides 3 and 4 are separated out with the outer map of the StrideTable, which separates strides with different stride distances or stride starts into different ordered maps. 
 			
-			Now, the inner map needs to merge all adjoining strides, while not merging strides like stride 5. This problem is exactly the problem of merging of overlapping intervals, which is already well understood. But to be complete, a solution outline will be detailed here. % union of intervals, and is a much more well known pronl
+			Now, the inner map needs to merge all adjoining strides, while not merging strides like Stride 5. This problem is exactly the problem of merging overlapping intervals, which is already well understood. But to be complete, a solution outline will be detailed here. % union of intervals, and is a much more well known pronl
 			
 			The inside map is ordered by the first element in the interval (which just happens to be a stride). Overlapping intervals are always merged, there will never be overlapping intervals in the map. This property will be used to guarantee efficiency.
 			
-			To see how this can be done, consider merging in stride 1 into the StrideTable when stride 2 and 5 were already added. 
+			To see how this can be done, consider merging in Stride 1 into the StrideTable when Stride 2 and 5 were already added. 
 			
 			% below example, where there are three intervals in the table, and one intervals being added. The first intervals cannot be merged with the added intervals, and the other two can. 
 			
