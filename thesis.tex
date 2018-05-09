@@ -188,12 +188,12 @@
 		But because each core of a many-core processor needs to execute general purpose code efficiently, each core is large, complex, and power hungry, so relatively few cores can be placed on a single chip. Today, high end many-core processors typically have at most two dozen cores. 
 		
 		This limitation was caused by the cores being general purpose. Hardware, however, does not need to be general purpose. 
-		Individual applications often have a specific type of procedure that consumes the vast majority of the computing power. For these applications, hardware developers can build an accelerator that runs that procedure very efficiently but does not run other types of code. The general purpose processor running the application can use the accelerator to compute that procedure quickly and then perform the rest of the computation itself. Encryption and decryption are commonly done with accelerators. 
+		Individual applications often have a specific type of procedure that consumes the vast majority of the computing power. For these applications, hardware developers can build an accelerator that runs that procedure very efficiently but cannot run other types of code. The general purpose processor running the application can use the accelerator to compute that procedure quickly and then perform the rest of the computation itself. Encryption and decryption are commonly done with accelerators. 
 		
-		Some hardware takes a compromise between generality and performance. Notably, Graphics Processing Units (GPUs), originally designed to accelerate graphics in video games, have become general enough to run many types of computations, and now run many important numeric scientific calculations. 
+		Some hardware takes a compromise between generality and performance. Notably, Graphics Processing Units (GPUs), originally designed to accelerate graphics in video games, have become general enough to run many types of computations and now run many important numeric scientific calculations. 
 		
 		This concept of using different hardware processes to run a single application process is called heterogeneous computing. 
-		The computer hardware industry is starting to put several different types of processors and accelerators are on a single chip, so heterogeneous computing is gaining increasing importance.
+		The computer hardware industry is starting to put several different types of processors and accelerators on a single chip, so heterogeneous computing is gaining increasing importance.
 		
 		
 	\section{Challenges of heterogeneous computing}
@@ -239,15 +239,15 @@
 	
 	\section{Parts of thesis}
 	
-		This thesis makes several contributions:
+		This thesis makes several contributions to the larger goal of helping the programmer understand the presence and type of parallelism in their code:
 		
 		\begin{enumerate}
 			\item Built a memory-efficient tool to detect parallelism in loops. 
 			\item Built a tool to collect a variety of metrics for our workload characterization. %, and match these metrics with the parallelism.
-			\item Analyze the possible effectiveness of these tools to distinguish between GPU and CPU oriented applications.
+			\item Analyzed the possible effectiveness of these tools to distinguish between GPU and CPU oriented applications.
 		\end{enumerate}
 	
-		Chapter 1 introduces parallelism detection and approaches to improve memory efficiency. Chapter 2 describes implementation details of the tools, and Chapter 3 presents some results on how well these tools ended up working. 
+		Chapter 1 introduces parallelism detection and approaches to improve memory efficiency in parallelism detection. Chapter 2 describes implementation details of the tools, and Chapter 3 presents some results on how well these tools ended up working. 
 		%We hope these will make progress towards the eventual goal.
 	
 		
@@ -255,11 +255,11 @@
 
 	\section{Introduction}
 	
-		We need a way of determining parallelism in order to do any useful inference on hardware compatibility. However, recall that our end goals are larger than just that. We are creating a tool that helps the programmer understand their code and helps them improve the algorithms and prototype them to perform better on different hardware without having the programmer actually deal with the hardware. Consequently, we not only want a parallelism tool that figures out which parts of the code can be parallelized or not, but we also want a tool that helps the programmer understand why code might not be parallelizable and perhaps suggests how to fix it. 
+		We need a way of determining parallelism in order to do any useful inference on hardware compatibility. However, recall that our end goals are larger than just that. We are creating a tool that helps the programmer understand their code and helps them improve the algorithms and prototype them to perform better on different hardware without having the programmer actually deal with the hardware. Consequently, we not only want a parallelism tool that figures out which parts of the code can be parallelized or not, but we also want a tool that helps the programmer understand why code might not be parallelizable and perhaps suggest how to fix it. 
 		 
 		We came to the conclusion that current open-source parallelism detection tools do not meet our efficiency and accuracy requirements, and so we built our own tool which does meet our needs. 
 		
-		This chapter goes over the necessary background for that tool. In section 1.2, we introduce the type of parallelism we are detecting, and why it is so important. In section 1.3, we introduce dynamic analysis of loops, a prerequisite for the base algorithm. In section 1.4, we introduce the base algorithm for detecting it, and the problems with that base algorithm. In section 1.5, we go over prior work in this area and discuss how it does not suit our needs completely. 
+		This chapter goes over the necessary background for that tool. In Section 1.2, we introduce the type of parallelism we are detecting, and why it is so important. In Section 1.3, we introduce dynamic analysis of loops, a prerequisite for the base algorithm. In Section 1.4, we introduce the base algorithm for detecting it, and the problems with that base algorithm. In Section 1.5, we go over prior work in this area and discuss how it does not suit our needs completely. 
 		
 	\section{Loop level parallelism}
 	
@@ -267,13 +267,13 @@
 		
 		This thesis focuses on loop-level parallelism (LLP). This type of parallelism is common, easy to detect, scalable on massively parallel processors, and simple for programmers to reason about. 
 		
-		\subsection{What is Loop level parallelism?}
+		\subsection{What is loop level parallelism?}
 		
 		We start by introducing some terminology. A loop is a code construct that executes the same instructions over and over on different data. A loop iteration is a single execution of the code in the loop. Two loop iterations are independent if the later iteration does not use data computed by the prior iteration. 
 		
 		Loop level parallelism exists when every iteration of the loop can be run independently from every other iteration. 
 		
-		\subsection{Examples of Loop level parallelism}
+		\subsection{Examples of loop level parallelism}
 		
 		Here is code that performs in-place vector-scalar multiplication on a vector \texttt{B} with \texttt{n} elements. 
 		%The loop executes n times, multiplying a different element of B each time. 
@@ -287,7 +287,7 @@ for(int i = 0; i < n; i++){
 		\end{lstlisting}
 		\end{codeexample}
 		
-		This loop is parallelizable. In this loop, each iteration is simply the calculation of \texttt{B[i] = B[i] * c} for some \texttt{i}. Since the iteration is dependent only on the element of \texttt{B} that it also updates, any of these iterations can be executed before any other iteration. So you can compute these iterations in any order without affecting correctness, so the loop is parallelizable. 
+		This loop is parallelizable. In this loop, each iteration is simply the calculation of \texttt{B[i] = B[i] * c} for some \texttt{i}. Since the iteration is dependent only on the element of \texttt{B} that it also updates, any of these iterations can be executed before any other iteration. You can compute these iterations in any order without affecting correctness, so the loop is parallelizable. 
 		
 		In contrast, here is code that performs a cumulative sum. 
 		
@@ -300,11 +300,11 @@ for(int i = 1; i < n; i++){
 		\end{lstlisting}
 		\end{codeexample}
 		
-		This loop is not parallelizable. For \texttt{i > 1}, \texttt{B[i] = B[i-1] + A[i];} cannot be computed correctly until \texttt{B[i-1]} is calculated, since \texttt{B[i-1]} is used to calculate \texttt{B[i]}. To summarize, the loop must be executed in a particular order, so it is not parallelizable. 
+		This loop is not parallelizable. For \texttt{i > 1}, \texttt{B[i] = B[i-1] + A[i]} cannot be computed correctly until \texttt{B[i-1]} is calculated, since \texttt{B[i-1]} is used to calculate \texttt{B[i]}. To summarize, the loop must be executed in a particular order, so it is not parallelizable. 
 		
 		\subsection{Importance of loop level parallelism}
 		
-		Loop level parallelism is important to this work for four reasons: it is common, scales well on massively parallel hardware, simple for programmers to reason about, and easy to detect. 
+		Loop level parallelism is important to this work for four reasons: it is common, scales well on massively parallel hardware, is simple for programmers to reason about, and is easy to detect. 
 		
 		Loop level parallelism is common and easy for programmers to reason about. 
 		A large amount of work in research and tool development has been devoted to exploiting loop level parallelism. Many parallelism frameworks are focused on loop level parallelism. OpenMP is a C and C++ parallelism framework that allows programmers to parallelize loops (assuming they are parallelizable) on CPUs with a single line of code. 
@@ -337,7 +337,7 @@ for(int i = 1; i < n; i++){
 		This is a surprisingly challenging problem. 
 		Loops have a clean structure in high level languages like C. It is easy for both the compiler and a human to understand what code is inside the body of a loop, and when the loop starts and ends. However, this work focuses on the dynamic analysis of loops. 
 		
-		Doing dynamic analysis requires us to understand the structure of loops in machine code. Even if the source code is available, there is not always a precise mapping from machine code to source code, as loops may be compiled to different machine code depending on the compiler. Loops in machine code are hard to detect, as they are implemented with ``go to'' instructions (referenced in this thesis as goto). goto instructions allow the code to jump to fixed instructions elsewhere in the code. These instructions implement various functionality like if-else blocks, while loops, and break statements, so their presence does not guarantee a loop.
+		Doing dynamic analysis requires us to understand the structure of loops in machine code. Even if the source code is available, there is not always a precise mapping from machine code to source code, as loops may be compiled to different machine code depending on the compiler. Loops in machine code are hard to detect, as they are implemented with ``go to'' instructions (referred to in this thesis as goto). goto instructions allow the code to jump to fixed instructions elsewhere in the code. These instructions implement various functionality like if-else blocks, while loops, and break statements, so their presence does not guarantee a loop.
 		
 		To demonstrate the difficulty of finding loops in machine code, here is the standard way of translating the above vector-scalar multiply loop into machine code:
 		
@@ -352,7 +352,7 @@ goto line 2
 ...
 		\end{lstlisting} 
 		
-		Note that even with a single simple loop, there are two goto statements, one for creating the loop, and one for exiting the loop. With nested loops, branches, and break statements, it quickly becomes very difficult to understand where a particular loop starts and how to know that a particular loop terminated.
+		Note that even with a single simple loop, there are two goto statements, one for creating the loop and one for exiting the loop. With nested loops, branches, and break statements, it quickly becomes very difficult to understand where a particular loop starts and how to know that a particular loop terminated.
 		So in order to understand loops in machine code, we have to somehow separate loops out from a tangle of goto instructions. 
 		
 		Luckily, there is prior work for doing just this. We use LoopProf \footnote{\cite{Chen:2004}} code in order to detect the locations of loops in code. In particular, LoopProf tells us where the loop begins and the nesting structure of loops. 
@@ -369,7 +369,7 @@ goto line 2
 		Recall that loop-level parallelism occurs when each iteration of a loop can be executed independently from every other iteration, and that independence means that one iteration does not depend on data computed by another iteration. 
 		The pairwise method tracks reads and writes to memory to determine dependences. Each read is considered to be an input to the computation in the loop, and each write is an output. If one loop iteration writes to one location in memory and a later iteration reads from that same location, then that is a dependence that should be recorded as it inhibits parallelism. 
 		
-		There is an important difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, consider a location in memory that is written to before it is read in a loop iteration. The data that was previously at that location was overwritten, so the current iteration will not depend on data at that location that was written to in previous iterations. In this case, we say the location is "killed." Reads of killed memory locations are not tracked in a given iteration.
+		There is an important difference between memory and dependencies. Memory can sometimes be reused without creating dependencies. In particular, consider a location in memory that is written to before it is read in a loop iteration. The data that was previously at that location was overwritten, so the current iteration will not depend on data at that location that was written in previous iterations. In this case, we say the location is "killed." Reads of killed memory locations are not tracked in a given iteration.
 		
 		The pairwise method stores two different structures for a particular loop:
 		
@@ -567,7 +567,7 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 			\hline
 		\end{tabular}
 	
-		\noindent When the inner loop finishes, its history table is merged into the pending table of the outer loop, meaning all of the reads of arrays \texttt{x} and \texttt{M[i]} are put in the pending table of the outer loop. In that pending table, \texttt{sum} is written to but not read; since the first access is a write, in the outer loop, \texttt{sum} is considered killed, and no further reads or writes to \texttt{sum} will be put in the pending table, including the accesses from in the inner loop, or the access on line 11. 
+		\noindent When the inner loop finishes, its history table is merged into the pending table of the outer loop, meaning all of the reads of arrays \texttt{x} and \texttt{M[i]} are put in the pending table of the outer loop. In that pending table, \texttt{sum} is written to (line 2) but not read; since the first access is a write, in the outer loop, \texttt{sum} is considered killed, and no further reads or writes to \texttt{sum} will be put in the pending table, including the accesses from in the inner loop, or the access on line 11. 
 		%When line 11 is executed, this read of \texttt{sum} is also is not put in the pending table, as \texttt{sum} is still killed. 
 		However, the first write to \texttt{sum} on line 2 is still an important access that could cause a dependency in an outer loop, so it still needs to be stored. 
 		
@@ -626,8 +626,8 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 	
 		\subsection{Naive implementation}
 		
-		An implementation of the pairwise method simply needs to define the data structures of the pending and history table, and make the capitalized procedures more precise.	
-		The naive implementation of the pairwise method uses the following data structures and procedures:
+		An implementation of the pairwise method simply needs to define the data structures of the pending and history table and make the capitalized procedures more precise.	
+		The naive implementation of the pairwise method uses the following data structures and procedures.
 		
 		The pending and history tables are implemented as a hash table indexed by memory addresses and which stores sets of instructions. To simplify the procedure, tables for writes and reads are separate, so there are two pending tables, one for reads and one for writes. The table procedures outlined in the pairwise algorithm description are implemented as follows:
 		
@@ -642,7 +642,7 @@ for(int i = 0; i < output_size; i++){	 	//outer loop
 		
 	\section{Prior work on optimizing the pairwise method}\label{s:optimize-pairwise}
 		
-		Naive implementations of the pairwise method have a severe memory overhead that limits the usefulness of the approach. Kim et al.'s work\footnote{\cite{Kim:2010}} mitigates this problem by reducing memory consumption through compression. Our work follows the mechanism used in the SD$^3$ paper to reduce memory overhead. This section gives an overview of the memory considerations involved with the pairwise method and prior attempts to fix this by compressing the working memory. 
+		Naive implementations of the pairwise method have a severe memory overhead that limits the usefulness of the approach. Kim et al.'s work mitigates this problem by reducing memory consumption through compression\footnote{\cite{Kim:2010}}. Our work follows the mechanism used in the SD$^3$ paper to reduce memory overhead. This section gives an overview of the memory considerations involved with the pairwise method and prior attempts to fix this by compressing the working memory. 
 		
 		\subsection{Memory overhead of pairwise method}
 		
@@ -712,30 +712,34 @@ for(int i = 1; i < 12; i = i + 3){
 		The SD$^3$ method detects both the existence and interval of strided accesses. 
 		Some access patterns are not strided, and if so, the memory accesses should not be treated as strides. When accesses are strided, then the interval of the stride must be calculated dynamically.  
 		
-		SD$^3$ suggests using an online stride detection algorithm to calculate both the existence and length of strides.
-		This algorithm keeps a global data structure separate from the loop stack which keeps track of separate state machines for every instruction. The state machine is organized as follows:
-		
 		\begin{figure}[h]
-			\caption{Stride detector state machine}
+			\caption{Stride detector state machine\footnotemark{}}
 			\label{fig:stride-detector}
 			\includegraphics[scale=0.6]{stride-detector}
 		\end{figure}
+		\footnotetext{\cite{Kim:2010}} 
 		
-		This state machine keeps track of the stride length and position of previous accesses, inferring the stride length of the current access. The strong stride-weak stride states allow for short interruptions in otherwise consistent stride pattern. This may be helpful, for example, when accessing the rows of a two dimensional array. In this case, the access pattern may be unpredictable when switching between rows, but the overall stride pattern will remain the same. 
+		SD$^3$ suggests using an online stride detection algorithm to calculate both the existence and length of strides.
+		This algorithm keeps a global data structure separate from the loop stack which keeps track of separate state machines for every instruction. The state machine is organized as follows:
 		
+		
+		This state machine keeps track of the stride length and position of previous accesses, inferring the stride length of the current access. The strong stride-weak stride states allow for short interruptions in an otherwise consistent stride pattern. This may be helpful, for example, when accessing the rows of a two dimensional array. In this case, the access pattern may be unpredictable when switching between rows, but the overall stride pattern will remain the same within each row.
+		
+		
+		 
 		\subsubsection{Data structure for non-strided accesses}
 		
-		Some memory access patterns are not strides. When this is the case, the SD$^3$ method calls these accesses ``points'', and puts them in a ``point table'', which is similar in structure to the pending and history tables in the naive method. These are kept separate from the strides, which are put in the ``stride table''. There is both a stride and a point table inside each history and each pending table. 
+		Some memory access patterns are not strides. When this is the case, the SD$^3$ method calls these accesses ``points'', and puts them in a ``point table'', which is similar in structure to the pending and history tables in the naive method. These are kept separate from the strides, which are put in the ``stride table''. There is both a stride and a point table inside each history and each pending table.  
 		
 		\subsubsection{Data structure for strided accesses}
 		
-		Operations on non-strided accesses are efficient because the memory location of an access can be looked up quickly using hash tables. However, strides can conflict and be merged even when they don't start or end on the same address, so different data structures are needed. One possible method would just use a list of strides, but the pairwise comparisons needed to do conflict-check would take quadratic time. The SD$^3$ paper suggests use of interval trees to quickly prune the search space to mitigate this quadratic complexity.
+		Operations on non-strided accesses are efficient because the memory location of an access can be looked up quickly using hash tables. However, strides can conflict and be merged even when they don't start or end on the same address, so different data structures are needed. One possible method would just use a list of strides, but the pairwise comparisons needed to do conflict checking would take quadratic time. The SD$^3$ paper suggests use of interval trees to quickly prune the search space to mitigate this quadratic complexity.
 		
 		An interval tree is an augmented binary search tree that allows searches for intervals, instead of single values. An interval tree can efficiently find all intervals stored inside it which overlap with another interval. 
 		
 		Take the tree in Figure \ref{fig:interval-tree}, which stores 5 intervals, including \texttt{[20,30)}, \texttt{[10,15)}, and \texttt{[0,1)}. 
 		
-		%(WIKIPEDIA: \url{https://en.wikipedia.org/wiki/File:Example_of_augmented_tree_with_low_value_as_the_key_and_maximum_high_as_extra_annotation.png})
+		%(WIKIPEDIA:  \url{https://en.wikipedia.org/wiki/File:Example_of_augmented_tree_with_low_value_as_the_key_and_maximum_high_as_extra_annotation.png})
 		
 		\begin{figure}[h]
 			\caption{Interval Tree}
@@ -745,11 +749,13 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		This tree can be queried to find all intervals that overlap with another one, say \texttt{[40,50)} (this will return \texttt{[3,41)}, and \texttt{[29,99)}). Like an ordinary binary search tree, it is self-balancing and allows $O(\log(n))$ inserts and deletes. Finds are $O(m\log(n))$, where $m$ is the number of intervals it finds. 
 		
-		In the context of strides, each stride would simply be stored as an element in the tree keyed as an interval from first to last, inclusive. Then sets of strides will be looked up with efficiency relating to the total number of strides found, rather than the size of the set of strides. 
+		In the context of strides, each stride would simply be stored as an element in the tree keyed as an interval from first to last, inclusive. Then, operations like conflict checking can find strides that overlap with efficiency relating to the number of strides found, rather than the size of the set of strides. 
 		
 		\subsubsection{Merging strides}
 		
-		A simple way to MERGE two sets of strides is to join them together. However, this does not result in any compression. The online detection method generates strides for single accesses, which are immediately put in the pending table. So unless the adjoining strides in the history table are merged together with these strides during MERGE, the memory performance will not improve over the naive version. 
+		In order for the overall algorithm to use less memory than the naive version, individual strides must be merged together when merging together sets of strides in MERGE. 
+		%A simple way to MERGE two collections of strides is to join them together. But in order for the overall algorithm to compress the accesses. 
+		This is because the online detection method generates strides for single accesses, which are immediately put in the pending table. If collections of strides are joined naively during MERGE, then these single-access strides will be the only type of stride in the table, and memory performance will not improve over the naive version. 
 		
 		Two strides are mergeable when they can be written as a single stride. For example \texttt{(first:1, last:10, interval:3)} and  \texttt{(first:13, last:22, interval:3)} can be merged, since the stride  \texttt{(first:1, last:22, interval:3)} covers the same elements as the two of them combined. On the other hand, \texttt{(first:2, last:8,} \linebreak\texttt{interval:2)} and \texttt{(first:13, last:22, interval:3)} cannot be merged since simply extending the bounds of the stride cannot include all of the elements of both strides.
 		
@@ -760,7 +766,7 @@ for(int i = 1; i < 12; i = i + 3){
 		During CONFLICT-CHECK, there are 3 different types of possible access conflicts: point-point, point-stride, and stride-stride. Point-point conflicts are found exactly as in the naive version, with hash table lookups. Possible point-stride and stride-stride conflicts are found using interval trees. Checking point-stride conflicts efficiently is simple, but checking stride-stride conflicts in constant time is more complex. 
 		
 		SD$^3$ introduces a new algorithm called Dynamic-GCD which efficiently finds overlap between strides. 
-		To understand how constant time stride overlap checking is possible, consider infinite length strides. Take two infinite length strides, with stride length $a$ and $b$. Take two points, one from each stride, and calculate the distance between them. Call this distance $c$. Then there is an integer $x$ and $y$ such that $ax + by = c$ iff the strides conflict. This condition is in turn equivalent to $c = 0 \mod (\gcd(a,b))$, where $\gcd(a,b)$ is the greatest common denominator of $a$ and $b$. This test can be done in constant time with the well known Euclidean algorithm for the GCD. Now, finite strides sometimes do not intersect when their infinite counterparts do, so the Dynamic-GCD algorithm gives a similar, but more complex test than the above that uses the Extended Euclidean algorithm to exactly compute intersection for finite strides. 
+		To understand how constant time stride overlap checking is possible, consider infinite length strides. Take two infinite length strides, with stride length $a$ and $b$. Take two points, one from each stride, and calculate the distance between them. Call this distance $c$. Then there is an integer $x$ and $y$ such that $ax + by = c$ if and only if the strides conflict. This condition is in turn equivalent to $c = 0 \mod (\gcd(a,b))$, where $\gcd(a,b)$ is the greatest common denominator of $a$ and $b$. This test can be done in constant time with the well known Euclidean algorithm for the GCD. Now, finite strides sometimes do not intersect when their infinite counterparts do, so the Dynamic-GCD algorithm gives a similar, but more complex test than the above that uses the Extended Euclidean algorithm to exactly compute intersection for finite strides. 
 		
 	\section{Bit compression}\label{s:bit-compress}
 	
@@ -776,9 +782,9 @@ for(int i = 1; i < 12; i = i + 3){
 		A locally dense set implementation should use the advantages of dense and sparse set implementations. 
 		A sparse set of integers is best implemented using a hash table. A completely dense set of integers is best implemented using a bit array. So a locally dense set should be implemented by a hash table where each entry is a bit array that represents a contiguous range of integers starting at a particular location. Figure \ref{fig:bit-local-density} shows the the three different types of sets storing the set $\{0, 3, 10\}$. 
 		
-		The items in the hash table in the locally dense set are key value pairs. The key in a key value pair is a unique identifier to a location in the table. The value is other information 
+		The items in the hash table in the locally dense set are key value pairs. The key in a key value pair is a unique identifier to a location in the table. The value is other information associated with that key. In this case, the key is number/BlockSize, and the value is the bit array with length BlockSize.
 		
-		\begin{figure}[H]
+		\begin{figure}
 			\caption{Representations of the set $\{0, 3, 10\}$}
 			\label{fig:bit-local-density}
 			\includegraphics[scale=0.8]{BitSetComparison.pdf}
@@ -798,8 +804,8 @@ for(int i = 1; i < 12; i = i + 3){
 	\section{Introduction to workload characterization}
 		\label{s:workload-characht}
 	
-		Workload characterization measures how applications use hardware features. %Workload characterization uses dynamic analysis to collect the runtime characteristics of a set of applications. %running on some set of hardware and of the software. 
-		Hardware researchers are interested in the sorts of hardware characteristics that are important to application performance. They use workload characterization to understand how trade-offs in hardware design would affect various applications' performance. To accomplish this, they collect metrics on the applications they want to optimize. These metrics inform decisions about the of hardware trade-offs that hardware engineers are considering. 
+		Workload characterization measures the demands application place on hardware. %Workload characterization uses dynamic analysis to collect the runtime characteristics of a set of applications. %running on some set of hardware and of the software. 
+		Hardware researchers are interested in the sorts of hardware characteristics that are important to application performance. They use workload characterization to understand how trade-offs in hardware design would affect various applications' performance. To accomplish this, they collect metrics on the applications they want to optimize. These metrics inform decisions about the hardware trade-offs that hardware engineers are considering. 
 		
 		We are interested in a related question: What are the application characteristics that can help the programmer choose between different established hardware platforms? We use workload characterization to understand the platform independent characteristics of single threaded CPU programs that are indicators of performance for traditional multiprocessors and GPUs. 
 		
@@ -835,16 +841,16 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		Meanwhile CPUs have a MIMD (multiple instruction multiple data) model, where each thread executes code independently. CPUs are also equipped with advanced branch prediction which often reduces the cost of branches to nearly zero. Consequently, parallel code which executes different branch segments may run better on CPUs. 
 		
-		To account for this performance difference, we collect a count of the number of conditional branches encountered, and the number of times the path of that branch changed. These branch changes capture the probability that different threads in a GPU warp will take different branch paths. 
+		To account for this performance difference, we collect a count of the number of conditional branches encountered, and the number of times the path of that branch changed. These branch changes captures the probability that different threads in a GPU warp will take different branch paths. 
 		
 		\subsubsection{Predictability of memory accesses}
 		
 		GPUs have global memory that is optimized for high bandwidth and high latency. Predictable accesses such as strided memory can be streamed from GPU memory to the cores efficiently, while unpredictable memory accesses stall the instruction pipeline because they take longer to access. 
 		%[CITATION???] possibly file:///C:/Users/weepi/Documents/thesis/papers/CCWS.pdf 
-		In contrast, CPUs have larger caches that accommodate data reuse, and so are much better at handling unpredictable memory if that memory fits inside the caches. % also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
+		In contrast, CPUs have larger caches that accommodate data reuse and so are much better at handling unpredictable memory if that memory fits inside the caches. % also benefit from predictable memory accesses, but to a lesser extent, since the memory structure is optimized towards lower latencies. 
 		
 		We chose to capture this performance difference by measuring the number and length of strided accesses. 
-		We use the same stride detector code as in our pairwise method (see section \ref{sse:stride-descr}.2 for a design). 
+		We use the same stride detector code as in our pairwise method (see Section \ref{sse:stride-descr}.2 for a design). 
 		
 		% Then, we simply count the number of accesses which are of certain stride lengths, including zero length strides, and those that cannot be detected as strides. 
 		
@@ -895,10 +901,10 @@ for(int i = 1; i < 12; i = i + 3){
 	
 		For a tool to detect loop level parallelism and collect loop level metrics, it first needs to understand where the loops are in the code. To do this, we run LoopProf (discussed in Section \ref{s:loopprof-detection}) on the application to collect information about which instructions loops start and end on. 
 		
-		To detect parallelism, we created a tool powered by Intel Pin\footnote{\cite{Luk:2005}} which uses the loop information generated by LoopProf. This tool calls methods from the parallelism detection algorithm when loops start and end, and when memory is accessed. When the program finishes, the parallelism detection algorithm outputs its results of how many loop iterations conflicted and which pairs of instructions those conflicts originated from. 
+		To detect parallelism, we created a tool powered by Intel Pin\footnote{\cite{Luk:2005}} which uses the loop information generated by LoopProf. This tool calls methods from the parallelism detection algorithm when loops start and end and when memory is accessed. When the program finishes, the parallelism detection algorithm outputs its results of how many loop iterations conflicted and which pairs of instructions those conflicts originated from. 
 		
 		To collect loop level metrics we created another analysis tool powered by Intel Pin\footnote{\cite{Luk:2005}} which uses the loop information generated by LoopProf. 
-		Similarly to the pairwise method, this tool collects loop level information by keeping a stack of data about each current active loop, and when the loop terminates, it does two things. First, it accumulates the information about the current loop instance into a summary of all the instances in the static loop. Then it simply passes its information to the loop below it on the stack, which accumulates that information with its own information. 
+		Similar to the pairwise method, this tool collects loop level information by keeping a stack of data about each current active loop, and when the loop terminates, it does two things. First, it accumulates the information about the current loop instance into a summary of all the instances in the static loop. Then it simply passes its information to the loop below it on the stack, which accumulates that information with its own information. 
 		
 		\subsection{Stack and register memory}
 		\label{s:stack-reg-con}
@@ -907,21 +913,21 @@ for(int i = 1; i < 12; i = i + 3){
 		
 		Real world parallelism detectors use static analysis to detect these induction variables.\footnote{\cite{Kim:2010}} Static analysis is effective in this case because loop indices are almost always stored in a fixed location in the stack or in registers, so only fixed locations of memory need to be checked for the properties that induction variables have.
 		
-		Unfortunately, we did not have time to do any static analysis. To deal with this issue, our Pin tool which records accesses simply ignores all stack and registers access. While this means we do detect parallel loops, it also means that some problematic memory conflicts are not detected. 
+		Unfortunately, we did not have time to do any static analysis. To deal with this issue, our Pin tool which records accesses simply ignores all stack and registers accesses. While this means we do detect parallel loops, it also means that some problematic memory conflicts are not detected. 
 
 \begin{codeexample}
 	\caption{Loop Induction}
 	\label{ce:induction}
 \begin{lstlisting}
 int i = 0;
-while(i < 1000)){
+while(i < 1000){
 	i = i + 1;
 }
 \end{lstlisting}
 \end{codeexample}
 		
 		One example of a problematic dependency carried in registers is the \texttt{carry} bit in multiprecision addition.
-		Say you have 2 numbers of arbitrary size, \texttt{A}, and \texttt{B}, and are putting the result in \texttt{R}. These are stored as arrays where \texttt{A[i]} is the \texttt{i}th 64 bit block of \texttt{A}. Then Code Example \ref{ce:multi-addition} shows an algorithm to compute addition. Note that the \texttt{carry} variable is a non-trivial dependence would could force this algorithm to be run sequentially. 
+		Say you have two arbitrary size integers, \texttt{A} and \texttt{B}. You add these together and store the results in \texttt{R}. These arbitrary size integers are stored as arrays where \texttt{A[i]} is the \texttt{i}th 64 bit block of \texttt{A}. Code Example \ref{ce:multi-addition} shows an algorithm to compute this addition. Note that the \texttt{carry} variable is a non-trivial dependence which could force this algorithm to be run sequentially. 
 
 \begin{codeexample}
 	\caption{Arbitrary-precision Addition}
@@ -951,7 +957,7 @@ for(int i = 0; i < max_size(A,B); i++){
 		
 		\subsubsection{Rodinia}
 		
-		Rodina is a benchmark suite designed to compare CPU and GPU performance on different applications. The Rodinia applications are chosen to reflect the Berkley 7 dwarves of scientific computation.\footnote{\cite{Che:2010}} All of these applications are parallelizable to some degree, and most of them are effective on GPUs. 
+		Rodina is a benchmark suite designed to compare CPU and GPU performance on different applications. The Rodinia applications are chosen to reflect the Berkeley 7 dwarves of scientific computation.\footnote{\cite{Che:2010}} All of these applications are parallelizable to some degree, and most of them are effective on GPUs. 
 		
 		For each algorithm, Rodinia has a CPU implementation which is multi-threaded using OpenMP. Since our tool does not support multithreaded applications, we removed the OpenMP compilation flag, and removed calls to the OpenMP library such as \texttt{omp\_get\_thread\_num()} from the source code. 
 		
@@ -959,7 +965,7 @@ for(int i = 0; i < max_size(A,B); i++){
 		
 		Parsec is a benchmark of multi-threaded applications designed for multiprocessors.\footnote{\cite{Bienia:2008}} It has a more diverse range of applications than Rodinia, including computer vision and textual analysis as well as traditional scientific computing applications.
 		
-		Parsec was more difficult to get running on our system. There were some applications which were incompatible with C++11, and did not compile, and many others which could not be altered to run single threaded without substantially changing the structure of the code, and so they could not be run on our analysis tools. We present results only for the applications that we could successfully compile and run on our tools. 
+		Parsec was more difficult to get running on our system. There were some applications which were incompatible with C++11 and did not compile, and many others which could not be altered to run single threaded without substantially changing the structure of the code, and so they could not be run on our analysis tools. We present results only for the applications that we could successfully compile and run on our tools. 
 		
 
 	
@@ -983,7 +989,7 @@ for(int i = 0; i < max_size(A,B); i++){
 				\item After a loop iteration finishes,
 				\begin{enumerate}
 					\item Check for conflicts between accesses in the pending and history tables. This is referred to as Conflict-Check.
-					\item Merge the pending table into history table.
+					\item Merge the pending table into the history table.
 				\end{enumerate}
 				\item After an entire loop ends,
 				\begin{enumerate}
@@ -1019,7 +1025,7 @@ for(int i = 0; i < max_size(A,B); i++){
 			\begin{enumerate}
 				\item If the memory location $m$ is killed according to the pending table's AddressSet, do nothing and skip the rest of the steps. 
 				\item Add the bytes accessed by $m$ to the appropriate AddressSet.
-				\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride. It can be viewed as a stride, then look up the stride distance $d$ which was evaluated by the stride detector. 
+				\item Find the loop-independent stride detector that corresponds to instruction $i$, and use it to calculate whether $m$ is a stride. If it can be viewed as a stride, then look up the stride distance $d$ which was evaluated by the stride detector. 
 				%\item Get the point table, stride table, and AddressSet of LoopInstance $L$ corresponding to the accessmode of $L$.
 				\item If $m$ is a stride with stride distance $d$, then add it to the appropriate stride table.
 				\item If $m$ is not a stride, add it to the appropriate point table. 
@@ -1036,7 +1042,7 @@ for(int i = 0; i < max_size(A,B); i++){
 		
 		\subsubsection{Stride Detection}
 		
-		The StrideDetector is implemented to match the original SD$^3$ design described in section \ref{sse:stride-descr} as closely as possible. The state machine matches Figure \ref{fig:stride-detector}.
+		The StrideDetector is implemented to match the original SD$^3$ design described in Section \ref{sse:stride-descr} as closely as possible. The state machine matches Figure \ref{fig:stride-detector}.
 		
 		\subsubsection{Adding points to the PointTable}
 		
@@ -1062,7 +1068,7 @@ for(int i = 0; i < max_size(A,B); i++){
 		\subsubsection{Adding Strides to the StrideTable}
 			
 			Strides are also added to the StrideTable during new memory accesses and merges. 			
-			When possible, strides need to be merged into existing strides in the table. This is critical for compression (see section \ref{sse:stride-descr}.5). The StrideTable is designed to make this process simple and efficient. 
+			When possible, strides need to be merged into existing strides in the table. This is critical for compression (see Section \ref{sse:stride-descr}.5). The StrideTable is designed to make this process simple and efficient. 
 			At a high level, the StrideTable is a set of ordered sets of strides. 
 			Figure \ref{fig:stride-table} shows a precise outline of how the table is structured.  %The outer set ensures that a particular inner set contains only strides which are mergeable if they adjoin. The inner ordered set is used to check if the strides do adjoin, in which case, they are mergeable.
 			
@@ -1114,7 +1120,7 @@ for(int i = 0; i < max_size(A,B); i++){
 			
 			Since intervals in the table will never overlap, the interval directly below the added interval (the (0,2) interval) is the only possible interval that starts before it, and also could overlap. % In the example, this is (1,3) interval. 
 			%
-			The intervals above the added interval (in this case, (14,20)) can be efficiently checked because they are mergeable if their first element is less than the added interval's last element. %Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
+			The intervals above the added interval (in this case, (14,20)) can be efficiently checked because they are mergeable if and only if their first element is less than the added interval's last element. %Then, it will merge every stride which starts after it starts, but ends before the added stride ends.
 			
 			%Two strides are possibly mergeable if they have the same instruction address, the same stride distance, the strides would be the same if they were infinite length. Referring back to Figure \ref{fig:stride-table}, these are exactly the strides which have the same value in the outer set, and so are placed in the same binary search tree. 
 			
@@ -1182,7 +1188,7 @@ bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 		
 		\subsection{Checking conflicts}
 			
-			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer: either the loop is parallel, or it is not. The second, slower operation, FindConflictingInstructions, finds the particular pairs of instructions which accessed the conflicting memory. Later, these instructions are reported to the user. FindConflictingInstructions is only run when IsParallel returns false, since there would never be conflicts in a parallel loop. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures, which we describe below. 
+			In SD$^3$, there is a single procedure that evaluates memory conflicts using the point and stride tables. We broke this into two procedures for performance reasons.  The first procedure, IsParallel, is a fast operation that gives a binary answer: either the loop is parallel or it is not. The second, slower operation, FindConflictingInstructions, finds the particular pairs of instructions which accessed the conflicting memory. Later, these instructions are reported to the user. FindConflictingInstructions is only run when IsParallel returns false, since there would never be conflicts in a parallel loop. Figure \ref{fig:conflict-check} shows the general outline of the relevant operations and data structures, which we describe below. 
 			
 			\begin{figure}
 				\caption{Conflict-Check outline}
@@ -1201,7 +1207,7 @@ bitset_table[memaddr / BlockSize][memaddr % BlockSize] = 1;
 		\subsubsection{Find Overlapping}
 		
 			FindOverlapping finds pairs of overlapping intervals. This is another well known interval problem. We use a sorted list technique. 
-			The idea behind the algorithm is to sort the lists of intervals by their first element, and then going through all the intervals in one of the lists, and finding every element in the other list that overlaps with it. In order to do this efficiently, information about the second list is stored. % two lists while storing information about one of the lists. 
+			The idea behind the algorithm is to sort the lists of intervals by their first element, and then go through all the intervals in one of the lists, and find every element in the other list that overlaps with it. In order to do this efficiently, information about the second list is stored. % two lists while storing information about one of the lists. 
 			Algorithm \ref{algo:findoverlapping} gives a precise description of this algorithm. %It takes in two lists, $A$, and $B$, and immediately sorts them. $A$ is simply traversed sequentially. $B$ is traversed as $A$ is traversed while keeping some properties true. These properties are as follows. The current interval of $B$ is the first interval that starts after the interval from $A$ starts (the \texttt{ib} variable in Algorithm \ref{algo:findoverlapping}). It also stores the intervals in $B$ that started before $A$ starts, and end before it ends (the \texttt{before\_last}).
 			
 		 	%From this, all the intervals from $B$ that overlap with the current \texttt{interval} from $A$ can be found quickly: The entire contents of \texttt{before\_last} overlaps with the \texttt{interval} from $A$. All intervals from $B$ which start before \texttt{interval} ends also overlap.
@@ -1255,16 +1261,16 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		
 		\subsubsection{Filter Conflicting}
 		
-			Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm to check if a pair of overlapping strides really do conflict. We found it difficult to work out the details of this algorithm, so we instead decided to use a different method. In particular, the vast majority of strided conflicts will be much easier to check for conflicts. We built our approach by making several observations about strides.
-			
+			Recall that the SD$^3$ paper uses the efficient Dynamic-GCD algorithm to check if a pair of overlapping strides really do conflict. We found it difficult to work out the details of this algorithm, so we instead decided to use a different method. It is based on a slow method of checking strides that compares the strides element by element. As an optimization, we use case specific methods of checking that are checkable by methods simpler than Dynamic-GCD and faster than element comparison. We built these case specific methods by making several observations about strides.
+			%
 			\begin{enumerate}
 				\item Many strides will be dense, meaning every byte in between the start and end of the interval will be accessed. Any overlapping strides are assumed to conflict if one of them is dense. This assumption is not always true and could result in false positives. 
-				\item Many other possible conflicting strides will have the same stride distance. Then the strides conflict if the difference in the stride starts modulo the stride distance is zero. 
-				\item Many strides will have long interval overlap compared to the stride distances. Formally this is calculated by $$\text{lcm}(\text{stride distance 1}, \text{stride distance 2}) < \text{interval operlap}$$ In this case, the ordinary GCD test described in Section \ref{sse:stride-descr} gives the correct answer.
+				\item Many other possible conflicting strides will have the same stride distance. In this case, the strides conflict if and only if $$(\text{stride-start}_1 - \text{stride-start}_2) = 0 \mod (\text{stride distance})$$
+				\item Many strides will have long interval overlap compared to the stride distances. Formally this is calculated by $$\text{LCM}(\text{stride distance 1}, \text{stride distance 2}) < \text{interval operlap}$$ Where LCM is the least common multiple. In this case, the ordinary GCD test described in Section \ref{sse:stride-descr} gives the correct answer; the strides conflict if and only if the GCD test passes.
 			\end{enumerate}
 			Our method verifies if an observation holds for a particular case. For example, in the first case, it checks if one of the two strides is dense. Then it uses the properties of the case to check if the strides really do conflict. For example, in the third case, by performing the GCD test to check if the strides conflict. 
 			%Our method simply checks if these cases apply, and if so, calculates the answer.
-			If none of the properties are found to hold for a given pair of strides, then the two strides are checked for conflicts with a slow algorithm which compares the strides element by element.
+			If none of the properties are found to hold for a given pair of strides, then the two strides are checked for conflicts with the slow algorithm which compares the strides element by element.
 			 
 			%In particular, it is important to note that having constant time comparison is not needed for algorithmic efficiency of the method. After all, each element of the stride is added one at a time, and it is only compari
 			
@@ -1294,7 +1300,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		\subsubsection{Killing points and strides}
 		
 			Recall that when a history table is merged into the outer loop's pending table, killed addresses must not be added to the pending table. 
-			The SD$^3$ algorithm removes killed points and strides by a similar algorithm to their conflict-check method. We used AddressSets to do this instead. Given a particular point or stride, we simply use the AddressSet to check if the bytes that point or stride describe have been marked as killed. Strides and points are only removed if every byte they reference is killed. This could result in false positives when identifying conflicts. But we do not believe that this will be a common occurrence. %but it seems unlikely that partially killed points and strides are an important case. 
+			The SD$^3$ algorithm removes killed points and strides by a similar algorithm to their conflict-check method. We used AddressSets to do this instead. Given a particular point or stride, we simply use the AddressSet to check if the bytes that a point or stride describe have been marked as killed. Strides and points are only removed if every byte they reference is killed. This could result in false positives when identifying conflicts, but we do not believe that this will be a common occurrence. %but it seems unlikely that partially killed points and strides are an important case. 
 %			
 %			AddressSets are first killed with set subtraction, and then unioned into the appropriate set. 
 %			Stride and Point tables are merged by simply extracting every Point or Stride from the source table, and adding them one at a time into the destination table using the add method . 
@@ -1303,14 +1309,14 @@ find_overlapping_intervals(A : interval list, B : interval list)
 					
 		\section{Bit Compression Implementation}
 			
-			Stride compression introduces all sorts of complexity, creates performance issues, and does not guarantee good compression on all workloads. Bit compression (introduced in Section \ref{s:bit-compress}) has the potential to be the basis of a much simpler, faster compression system. % with less reliance on program specific characteristics. 
+			Stride compression introduces all sorts of complexity, creates performance issues, and does not guarantee good compression on all workloads. Bit compression (introduced in Section \ref{s:bit-compress}) has the potential to be the basis for a much simpler, faster compression system. % with less reliance on program specific characteristics. 
 			
 			%This approach may not have been suitable for Kim et. al.
 			%Unlike stride compression, it cannot even approximate
 			
 			\subsection{Main ideas}
 			
-			For our implementation, we combine the naive method's approach of listing instructions for each memory address, and bit compression's approach of breaking up the address space into contiguous blocks which are stored as bit arrays. This approach will allow us to keep track of instruction information while compressing memory addresses in bit arrays. 
+			For our implementation, we combine the naive method's approach of listing instructions for each memory address and bit compression's approach of breaking up the address space into contiguous blocks which are stored as bit arrays. This approach will allow us to keep track of instruction information while compressing memory addresses in bit arrays. 
 			The interactions of these ideas are explained below.
 			%Similarly to the naive method, accesses are grouped by their memory address, and instruction information is linked to. 
 			
@@ -1394,11 +1400,13 @@ find_overlapping_intervals(A : interval list, B : interval list)
 			
 			\subsection{Killing accesses}
 			
-			Recall that the accesses which are written but not read in the pending table are killed, and no further access should be added.
+			Recall that the accesses which are written but not read in the pending table are killed, and no further accesses to that address should be added.
 			
 			%So when adding new accesses, new accessed bytes are intersected
 			
-			So when merging the history table into the pending table, the bitset in the pending table which is the intersection of the write bitset and the negation of the read bitset is computed, and all instruction and overall bitsets in the BlockInfo at that location in the pending table are computed. 
+			So when adding a new access or merging in a BlockInfo into the pending table, a bitset of killed addresses for that block is found using the overall accesses bitset in the read and write parts of the pending table. This bitset of killed addresses removes the accesses in the BlockInfo by performing set subtraction on each bitset in the BlockInfo. Set subtraction on bitsets is easily implemented using bitwise negation and intersection. 
+			
+			%So when merging the history table into the pending table, the bitset in the pending table which is the intersection of the write bitset and the negation of the read bitset is computed, and all instruction and overall bitsets in the BlockInfo at that location in the pending table are computed. 
 			
 \chapter{Results}
 	
@@ -1501,7 +1509,7 @@ find_overlapping_intervals(A : interval list, B : interval list)
 		
 		One explanation for why stride compression performs poorly while running \texttt{bfs} is because the main process of \texttt{bfs} is not stride friendly. In the \texttt{bfs} (breadth first search) code, the graph is implemented as an adjacency list. 
 		%The inner loop of bfs traverses the edge list of a node, and touches another array based on the location specified by the edge. 
-		Code example \ref{code:bfs} is the inner loop of \texttt{bfs} copied from the source code. The \texttt{h\_graph\_edges} array stores the edge list, and the value it stores is used as an index into the \texttt{h\_graph\_visited} array. Since the locations at which the memory is accessed is dependent on the values in the input, the accesses to the elements of \texttt{h\_graph\_visited} will not necessarily be strided, that is, separated from one another by a fixed distance. 
+		Code Example \ref{code:bfs} is the inner loop of \texttt{bfs} copied from the source code. The \texttt{h\_graph\_edges} array stores the edge list, and the value it stores is used as an index into the \texttt{h\_graph\_visited} array. Since the locations at which the memory is accessed is dependent on the values in the input, the accesses to the elements of \texttt{h\_graph\_visited} will not necessarily be strided, that is, separated from one another by a fixed distance. 
 		
 		These non-strided accesses will then be stored as points, consuming as much memory as accesses in the naive method. Since these accesses are a significant part of overall accesses in \texttt{bfs}, memory performance as a whole will suffer. 
 		
@@ -1529,12 +1537,13 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		\subsection{Future work}
 		
-		Applications are continuing to become more and more memory intensive, so we will continue to need better memory compression methods to support that growth. We were considering using the SPEC 2017 applications for this thesis, but found that some of the applications on ``train'' inputs were consuming too much memory for our analysis. When running the ``intspeed'' benchmark (a subsection of the SPEC 2017 benchmark), the deepsjeng\_s application natively used almost 7GB of memory. When running the fpspeed benchmark, the lbs\_s application used 3.1GB of memory.  
-		Assume that these applications have similar compression ratios to \texttt{facesim}, which consumed 310MB natively, and the tools consumed around 10GB of the memory when profiling it. Then both of these applications could have an overhead of over 100GB, far more than ordinary systems have. 
+		Applications are continuing to become more and more memory intensive, so we will continue to need better memory compression methods to support that growth. We were considering using the SPEC 2017 applications for this thesis, but found that some of the applications on ``train'' inputs were consuming too much memory for our analysis. When running the ``intspeed'' benchmark (a subsection of the SPEC 2017 benchmark), the deepsjeng\_s application natively used almost 7GB of memory. When running the fpspeed benchmark, the lbs\_s application used 3.1GB of memory. 
+		
+		How much memory might the parallelism detection tool consume when run on memory intensive applications like these? The application \texttt{facesim} consumed 310MB of memory natively, and the both the compressed parallelism tools consumed over 10GB of the memory when profiling it, so the tools used 32x more memory than the native application. Assuming that an application like deepsjeng\_s or lbs\_s has a similar overhead ratio, both of these applications could have an overhead of over 100GB, far more than ordinary systems have. 
 
 		%These memory numbers far exceed that of the SPEC 2006 memory consumption on train inputs. 
 		
-		One possibility to improve compression ratios is to combine the stride and bit compression. This can be done by implementing the point table using bit compression, and possibly by putting small strides in the point table when they cannot be merged in with other strides. 
+		One possibility to improve compression ratios is to combine the stride and bit compression. This can be done by implementing the point table using bit compression, and possibly by putting short strides in the point table when they cannot be merged in with other strides. 
 		
 	
 	\section{Identifying important parallelism}\label{s:important-paralleism}
@@ -1544,11 +1553,11 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		\subsubsection{Caveat for the correctness of results}
 		
-		As discussed in Section \ref{s:stack-reg-con}, the parallelism detector does not detect dependencies carried through stack and register variables. This implied that it may not give correct results on certain algorithms where dependencies are carried by local variables. While we believe that this is uncommon, this remains an unverified assumption, so all the results in this section should be evaluated in the context of that assumption.
+		As discussed in Section \ref{s:stack-reg-con}, the parallelism detector does not detect dependencies carried through stack and register variables. This implies that it may not give correct results on certain algorithms where dependencies are carried by local variables. While we believe that this is uncommon, this remains an unverified assumption, so all the results in this section should be evaluated in the context of that assumption.
 		
 		\subsubsection{Significance of loops}
 		
-		Most loops consume a tiny faction of the applications' running times. Programmers usually want to optimize entire applications; individual loops are only optimized when significant portions of the application's running time is spent in the loop. Since the performance of these loops are unimportant to the programmer, they are not worth investigating, and should be eliminated from further analysis.  
+		Most loops consume a tiny fraction of the applications' running times. Programmers usually want to optimize entire applications; individual loops are only optimized when significant portions of the application's running time is spent in the loop. Since the performance of these loops are unimportant to the programmer, they are not worth investigating and should be eliminated from further analysis.  
 		%We found that certain loops, some parallelizable and some not, have outsized importance to program runtime. 
 		Figure \ref{fig:size-iteration-plots} shows the percentage of running time spent in the loops (estimated by machine instructions executed), how many iterations these loops have, and whether the loops were found to not have data conflicts (which means they are parallelizable). This plot includes all loops from all applications. 
 		%In the figure, loops which are parallel, and have a large number of iterations (blue dots, upper left) have a good chance of being usefully parallelized on GPUs. 
@@ -1585,9 +1594,9 @@ for(int i=h_graph_nodes[tid].starting;
 		We introduce a metric for the percentage of time spent that can be eliminated from the application by parallelizing the loop. It assumes a sort of idealized parallelism. It is calculated as
 		$$\text{time eliminated} = \frac{(\text{instructons executed in loop}) \times \frac{\text{iterations per instance} - 1}{\text{iterations per instance}}}{\text{instructions executed in application}} $$
 		%where the loop size is the proportion of time (approximated by instruction count) spent inside the loop. 
-		The percent time eliminated term, $\frac{\text{iterations per instance} - 1}{\text{iterations per instance}}$ assumes no overhead, infinite cores, and uniform loop iterations.
-		These assumptions are extremely optimistic, and so this estimate of time eliminated may also be overly optimistic. But it gives a rough estimate of parallizabililty. Many of the loops which score highly, are in fact very useful to parallelize, which we know since the benchmark suite successfully parallelized them. The loops which score poorly are certainly not useful to parallelize, as there is little gain found even with these generous assumptions. 
-		So this metric can be interpreted as an upper bound on how much the loop can reduce application performance if parallelized. 
+		The percent of time eliminated term, $\frac{\text{iterations per instance} - 1}{\text{iterations per instance}}$ assumes no overhead, infinite cores, and uniform loop iterations.
+		These assumptions are extremely optimistic, and so this estimate of time eliminated may also be overly optimistic. But it gives a rough estimate of parallelizability. Many of the loops which score highly are in fact very useful to parallelize, which we know since the benchmark suite successfully parallelized them. The loops which score poorly are certainly not useful to parallelize, as there is little gain found even with these generous assumptions. 
+		So this metric can be interpreted as an upper bound on how much the loop can reduce application execution time if parallelized. 
 		
 		%\subsubsection{Substantial parallelism of }
 		\begin{figure}
@@ -1596,7 +1605,7 @@ for(int i=h_graph_nodes[tid].starting;
 			
 			\begin{minipage}{0.73\textwidth} % choose width suitably
 				\includegraphics[scale=0.9]{plots/application_idealized_speedup.png}
-				{\footnotesize Speedup by parallelizing a the best loop in the given application assuming no overhead and infinite cores.\par}
+				{\footnotesize Speedup by parallelizing the best loop in the given application assuming no overhead and infinite cores.\par}
 			\end{minipage}
 		\end{figure}
 		This estimate of application speedup is a poor indicator of application parallelizability, %and so it is not particularly helpful information to give to a programmer, 
@@ -1612,7 +1621,7 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		First, there is the number of threads the work can be divided into. GPUs can run thousands of threads in parallel, while CPUs can at most run a few dozen. Since loop iterations are usually uniform, this can be estimated with the number of iterations in a loop instance. 
 		
-		Second, there is the amount of work that is done in each thread. Unlike idealized parallelism, real world parallelism on both CPUs and GPUs requires substantial time for the hardware to divide the work into parallel threads at runtime. This means that loops which do little work per iteration and have few iterations may not be effectively divided onto threads on either GPUs or CPUs. 
+		Second, there is the amount of work that is done in each thread. Unlike idealized parallelism, real world parallelism on both CPUs and GPUs requires substantial time for the hardware to divide the work into parallel threads at runtime. This means that loops which do little work per iteration and have few iterations may not be effectively parallelized on either GPUs or CPUs. 
 		Figure \ref{fig:paralleism-scale} plots these two metrics for the important parallel loops in all the applications. 
 		
 		\begin{figure}
@@ -1626,7 +1635,7 @@ for(int i=h_graph_nodes[tid].starting;
 		\end{figure}
 		
 		
-		CPUs can run a small number of threads effectively, and are ideal for parallelizing loops with a small number of iterations where each iteration does substantial work (upper left, colored red). GPUs are ideal for loops which have a large number of iterations (colored green). Loops which have a middling number of iterations (colored blue), and also have substantial work done per iteration (upper part of the graph), could be parallelized more effectively on a GPU or a CPU depending on additional details of the hardware under consideration. %If the programmer is targeting a server with 32 hardware threads, then that might result in a different evaluation than if the platform is a laptop with 4 hardware threads.%ifFor example in a decision between a laptop with 4 hardware threads and a integrated graphics card with 
+		CPUs can run a small number of threads effectively and are ideal for parallelizing loops with a small number of iterations where each iteration does substantial work (upper left, colored red). GPUs are ideal for loops which have a large number of iterations (colored green). Loops which have a middling number of iterations (colored blue), and also have substantial work done per iteration (upper part of the graph), could be parallelized more effectively on a GPU or a CPU depending on additional details of the hardware under consideration. %If the programmer is targeting a server with 32 hardware threads, then that might result in a different evaluation than if the platform is a laptop with 4 hardware threads.%ifFor example in a decision between a laptop with 4 hardware threads and a integrated graphics card with 
 		
 		%\subsubsection{Questionable parallelizability of some important parallel loops}
 		
@@ -1686,7 +1695,7 @@ for(int i=h_graph_nodes[tid].starting;
 		
 		This section suggests that this parallelism information can be rather useful to both the programmer and any further characterization of the code. Future work could create a tool which a programmer can easily use to evaluate parallelism. The programmer would provide the inputs to the application, and the analysis tool will tell the programmer where to consider different sorts of parallelism.
 		
-		A crude version of this tool was implemented to help debug the parallelism detector. It annotates the source code with comments containing the instruction addresses of the loops and with information about conflicts. Code example \ref{ce:par-tool-output} shows an example of this output on some matrix multiplication code. Note that the actual tool outputs more information, and the output is truncated here for better presentation. 
+		A crude version of this tool was implemented to help debug the parallelism detector. It annotates the source code with comments containing the instruction addresses of the loops and with information about conflicts. Code Example \ref{ce:par-tool-output} shows an example of this output on some matrix multiplication code. Note that the actual tool outputs more information, and the output is truncated here for better presentation. 
 		
 		\begin{codeexample}
 			\caption{Example output of parallelism tool}
@@ -1712,7 +1721,7 @@ for(int i=h_graph_nodes[tid].starting;
 		\end{verbatim}
 		\end{codeexample}
 	
-		In its current form, a developer can use this tool to find parallel loops, and see how many iterations they run in. For example, the outer loop of the matrix multiplication has 0 conflicting iterations, which means it is parallelizable. This can help assure the programmer that parallelizing the loop is possible. 
+		In its current form, a developer can use this tool to find parallel loops and see how many iterations they run in. For example, the outer loop of the matrix multiplication has 0 conflicting iterations, which means it is parallelizable. This can help assure the programmer that parallelizing the loop is possible. 
 		%If the programmer also knows that parallelizing it would improve performance
 		
 		For loops which have conflicts, the developer can track down where these conflicts are in the source code. In this case, the inner loop has a conflict. This conflict is labeled by the loop identifier so the programmer can easily track down which conflicts match with which loop. %be found in a large codebase because the conflict is labeled by the loop identifier. 
@@ -1725,7 +1734,7 @@ for(int i=h_graph_nodes[tid].starting;
 			%\item Making the output more user friendly
 			%\item Making the vague observations in this section about scale of parallelism and variability of loops into precise metrics that could be easily used. 
 			\item  Add an overall score of GPU and CPU parallelism for each loop, perhaps with some kind of performance modeling. 
-			\item  Adding static analysis that detects register and stack dependencies as discussed in  section \ref{s:stack-reg-con}.
+			\item  Adding static analysis that detects register and stack dependencies as discussed in  Section \ref{s:stack-reg-con}.
 		\end{itemize} 
 	
 	\section{Matching parallelism with other metrics}
@@ -1789,7 +1798,7 @@ for(int i=h_graph_nodes[tid].starting;
 	One of the problems encountered by prior work in parallelism detection is the massive memory overhead of the naive algorithm.
 	We confirmed that the simplest implementation uses too much memory to run real applications on real systems, and implemented two methods for reducing the memory footprint: stride compression and bit compression. We found that these two methods use comparable magnitudes of memory on most of the applications examined, and both are vast improvements over the naive method. As programmers find new ways of making use of larger quantities of system memory, these techniques will not be good enough, so we hint that future work could combine bit and stride compression into a single tool. 
 	
-	Another potential problem with the naive method of parallelism detection is that it only finds a certain type of parallelism: trivial loop-level parallelism. This raises the question of whether it is useful in detecting parallelism that is actually important to program performance. We found evidence that it does detect important parallelism for most the applications studied. To the extent to which the applications we examined are representative, this tool does in fact detect real parallelism. 
+	Another potential problem with the naive method of parallelism detection is	 that it only finds a certain type of parallelism: trivial loop-level parallelism. This raises the question of whether it is useful in detecting parallelism that is actually important to program performance. We found evidence that it does detect important parallelism for most of the applications studied. To the extent to which the applications we examined are representative, this tool does in fact detect real parallelism. 
 	Future work could make the tool more accessible to the programmer by producing more informative output. Future work could also produce more accurate results by incorporating static analysis. 
 	
 	Finally, we started addressing the challenge of how to inform the programmer about software characteristics other than parallelism and their effects on hardware performance. We collected several loop level metrics other than parallelism, and suggested that they would be important in evaluating the effectiveness of accelerating the loops on GPUs vs. CPUs. 
