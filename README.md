@@ -4,4 +4,4 @@ The compiled pdf of the document is in [thesis.pdf](https://github.com/weepingwi
 
 The main code contribution, the parallelism detection tool itself, is in my git repository [SD3-implementation](https://github.com/weepingwillowben/SD3-implementation).
 
-Supporting code is unfortunately based on LoopProf, which has not been released publicly, so it is not publicly available. Please contact me at benblack769@gmail.com or Kelly Shaw at kshaw.reed.edu for full code and data.
+Supporting code is unfortunately based on LoopProf, which has not been released publicly, so it is not publicly available. Please contact me at benblack769@gmail.com or Kelly Shaw at kshaw@reed.edu for full code and data.
